@@ -1,0 +1,921 @@
+import { useState } from 'react';
+
+const AccountsFinance = () => {
+  // ========================================
+  // STATE MANAGEMENT
+  // ========================================
+
+  // Main transactions data array
+  const [transactions, setTransactions] = useState([
+    {
+      id: 'TXN-1025',
+      date: '2025-11-12',
+      type: 'Income',
+      description: 'Trip payment - ABC Logistics',
+      amount: 45000,
+      status: 'Completed',
+      category: 'Trip Payments',
+    },
+    {
+      id: 'TXN-1024',
+      date: '2025-11-12',
+      type: 'Expense',
+      description: 'Fuel - HP Petrol Pump',
+      amount: 12500,
+      status: 'Completed',
+      category: 'Fuel',
+    },
+    {
+      id: 'TXN-1023',
+      date: '2025-11-11',
+      type: 'Income',
+      description: 'Trip payment - XYZ Corp',
+      amount: 58000,
+      status: 'Pending',
+      category: 'Trip Payments',
+    },
+    {
+      id: 'TXN-1022',
+      date: '2025-11-11',
+      type: 'Expense',
+      description: 'Toll charges - Mumbai-Pune',
+      amount: 3500,
+      status: 'Completed',
+      category: 'Toll',
+    },
+    {
+      id: 'TXN-1021',
+      date: '2025-11-10',
+      type: 'Expense',
+      description: 'Vehicle maintenance - V-012',
+      amount: 18200,
+      status: 'Completed',
+      category: 'Maintenance',
+    },
+    {
+      id: 'TXN-1020',
+      date: '2025-11-10',
+      type: 'Income',
+      description: 'Trip payment - DEF Traders',
+      amount: 42000,
+      status: 'Failed',
+      category: 'Trip Payments',
+    },
+  ]);
+
+  // Modal states
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingTransactionId, setEditingTransactionId] = useState(null);
+  const [modalType, setModalType] = useState(''); // 'income' or 'expense'
+
+  // Form data state
+  const [formData, setFormData] = useState({
+    date: '',
+    type: 'Income',
+    description: '',
+    amount: '',
+    status: 'Completed',
+    category: '',
+  });
+
+  // Form validation errors
+  const [formErrors, setFormErrors] = useState({});
+
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ========================================
+  // COMPUTED VALUES
+  // ========================================
+
+  // Calculate summary values dynamically
+  const totalIncome = transactions
+    .filter(t => t.type === 'Income' && t.status === 'Completed')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpenses = transactions
+    .filter(t => t.type === 'Expense' && t.status === 'Completed')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const netProfit = totalIncome - totalExpenses;
+
+  const pendingInvoices = transactions
+    .filter(t => t.type === 'Income' && t.status === 'Pending')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Format currency (Adjusted for INR)
+  const formatCurrency = (amount) => {
+    const absAmount = Math.abs(amount);
+    let formatted;
+  
+    if (absAmount >= 10000000) { // Crore
+      formatted = (absAmount / 10000000).toFixed(2) + ' Cr';
+    } else if (absAmount >= 100000) { // Lakh
+      formatted = (absAmount / 100000).toFixed(2) + ' L';
+    } else {
+      formatted = absAmount.toLocaleString('en-IN');
+    }
+  
+    return `₹${amount < 0 ? '-' : ''}${formatted}`;
+  };
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter(txn => {
+    const matchesSearch = searchQuery === '' || 
+      txn.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      txn.id.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesType = filterType === 'All' || txn.type === filterType;
+    const matchesStatus = filterStatus === 'All' || txn.status === filterStatus;
+    
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // Get status class
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'Completed':
+        return 'bg-green-100 text-green-800';
+      case 'Pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'Failed':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-slate-100 text-slate-800';
+    }
+  };
+
+  // Calculate expense categories dynamically
+  const getExpenseCategories = () => {
+    const categories = {};
+    const completedExpenses = transactions.filter(t => t.type === 'Expense' && t.status === 'Completed');
+    
+    completedExpenses.forEach(txn => {
+      if (categories[txn.category]) {
+        categories[txn.category] += txn.amount;
+      } else {
+        categories[txn.category] = txn.amount;
+      }
+    });
+
+    const total = Object.values(categories).reduce((sum, val) => sum + val, 0);
+    
+    return Object.entries(categories).map(([category, amount]) => ({
+      category,
+      amount: formatCurrency(amount),
+      percentage: total > 0 ? Math.round((amount / total) * 100) : 0,
+    })).sort((a, b) => b.percentage - a.percentage);
+  };
+
+  const expenseCategoriesData = getExpenseCategories();
+
+  // ========================================
+  // FORM HANDLING FUNCTIONS
+  // ========================================
+
+  // Open modal for adding income
+  const handleAddIncome = () => {
+    setModalType('income');
+    setIsEditMode(false);
+    setEditingTransactionId(null);
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      type: 'Income',
+      description: '',
+      amount: '',
+      status: 'Completed',
+      category: 'Trip Payments',
+    });
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
+
+  // Open modal for adding expense
+  const handleAddExpense = () => {
+    setModalType('expense');
+    setIsEditMode(false);
+    setEditingTransactionId(null);
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      type: 'Expense',
+      description: '',
+      amount: '',
+      status: 'Completed',
+      category: 'Fuel',
+    });
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
+
+  // Open modal for editing transaction
+  const handleEditTransaction = (txn) => {
+    setModalType(txn.type.toLowerCase());
+    setIsEditMode(true);
+    setEditingTransactionId(txn.id);
+    setFormData({
+      date: txn.date,
+      type: txn.type,
+      description: txn.description,
+      amount: txn.amount.toString(),
+      status: txn.status,
+      category: txn.category,
+    });
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
+
+  // Close modal
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setIsEditMode(false);
+    setEditingTransactionId(null);
+    setModalType('');
+    setFormData({
+      date: '',
+      type: 'Income',
+      description: '',
+      amount: '',
+      status: 'Completed',
+      category: '',
+    });
+    setFormErrors({});
+  };
+
+  // Handle input change
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  // Validate form
+  const validateForm = () => {
+    const errors = {};
+
+    if (!formData.date) {
+      errors.date = 'Date is required';
+    }
+
+    if (!formData.description.trim()) {
+      errors.description = 'Description is required';
+    }
+
+    if (!formData.amount || formData.amount <= 0) {
+      errors.amount = 'Amount must be greater than 0';
+    }
+
+    if (!formData.category) {
+      errors.category = 'Category is required';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Submit form
+  const handleSubmitForm = (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    const transactionData = {
+      date: formData.date,
+      type: formData.type,
+      description: formData.description.trim(),
+      amount: parseFloat(formData.amount),
+      status: formData.status,
+      category: formData.category,
+    };
+
+    if (isEditMode) {
+      // UPDATE existing transaction
+      setTransactions(prev => prev.map(txn =>
+        txn.id === editingTransactionId
+          ? { ...txn, ...transactionData }
+          : txn
+      ));
+    } else {
+      // ADD new transaction
+      const newTransaction = {
+        id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
+        ...transactionData
+      };
+      setTransactions(prev => [newTransaction, ...prev]);
+    }
+
+    handleCloseModal();
+  };
+
+  // ========================================
+  // DELETE FUNCTIONALITY
+  // ========================================
+
+  const handleDeleteTransaction = (txn) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this transaction?\n\n${txn.description}\nAmount: ${formatCurrency(txn.amount)}\n\nThis action cannot be undone.`
+    );
+
+    if (confirmed) {
+      setTransactions(prev => prev.filter(t => t.id !== txn.id));
+    }
+  };
+
+  // ========================================
+  // SUMMARY CARDS DATA
+  // ========================================
+
+  const summaryCards = [
+    {
+      title: 'Total Income',
+      value: formatCurrency(totalIncome),
+      icon: 'account_balance_wallet',
+      iconBg: 'bg-green-500/10',
+      iconColor: 'text-green-500',
+      change: '+18.2%',
+      trend: 'up',
+    },
+    {
+      title: 'Total Expenses',
+      value: formatCurrency(totalExpenses),
+      icon: 'payment',
+      iconBg: 'bg-red-500/10',
+      iconColor: 'text-red-500',
+      change: '+12.5%',
+      trend: 'up',
+    },
+    {
+      title: 'Net Profit',
+      value: formatCurrency(netProfit),
+      icon: 'trending_up',
+      iconBg: 'bg-blue-500/10',
+      iconColor: 'text-blue-500',
+      change: '+25.7%',
+      trend: netProfit >= 0 ? 'up' : 'down',
+    },
+    {
+      title: 'Pending Invoices',
+      value: formatCurrency(pendingInvoices),
+      icon: 'receipt_long',
+      iconBg: 'bg-orange-500/10',
+      iconColor: 'text-orange-500',
+      change: '-8.3%',
+      trend: 'down',
+    },
+  ];
+
+  // Income and expense category options for dropdown
+  const incomeCategoryOptions = ['Trip Payments', 'Loading Charges', 'Unloading Charges', 'Other Income'];
+  const expenseCategoryOptions = ['Fuel', 'Toll', 'Maintenance', 'Salaries', 'Insurance', 'Misc'];
+
+  // ========================================
+  // RENDER COMPONENT
+  // ========================================
+
+  return (
+    <main className="flex-1 p-4 lg:p-6 xl:p-8 bg-slate-50 min-h-screen">
+      
+      {/* Page Header */}
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+        <div>
+          <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
+            <span>Home</span>
+            <span className="material-symbols-outlined text-xs">chevron_right</span>
+            <span>Accounts & Finance</span>
+          </div>
+          <h1 className="text-slate-900 text-2xl lg:text-3xl font-bold">
+            Accounts & Finance
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Manage income, expenses, and financial reports
+          </p>
+        </div>
+        
+        {/* Primary actions in header */}
+        <div className="flex items-center gap-3">
+          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <span className="material-symbols-outlined text-base">download</span>
+            Download Report
+          </button>
+          <button 
+            onClick={handleAddExpense}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">remove</span>
+            Add Expense
+          </button>
+          <button 
+            onClick={handleAddIncome}
+            className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">add</span>
+            Add Income
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {summaryCards.map((card, index) => (
+          <div
+            key={index}
+            className="relative flex flex-col gap-3 rounded-xl p-5 bg-white shadow-sm hover:shadow-lg transition-all duration-300 border border-slate-100"
+          >
+            <div className="flex justify-between items-start">
+              <div className={`p-3 rounded-lg ${card.iconBg}`}>
+                <span className={`material-symbols-outlined text-2xl ${card.iconColor}`}>
+                  {card.icon}
+                </span>
+              </div>
+              <div
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                  card.trend === 'up'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-red-100 text-red-700'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {card.trend === 'up' ? 'trending_up' : 'trending_down'}
+                </span>
+                {card.change}
+              </div>
+            </div>
+            <div>
+              <p className="text-slate-500 text-sm font-medium">{card.title}</p>
+              <p className="text-slate-900 text-2xl font-bold mt-1">{card.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent Transactions & Expense Categories */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+        {/* Recent Transactions Table */}
+        <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Transactions</h3>
+
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="flex-1 relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                search
+              </span>
+              <input
+                type="text"
+                placeholder="Search transactions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            >
+              <option value="All">All Types</option>
+              <option value="Income">Income</option>
+              <option value="Expense">Expense</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            >
+              <option value="All">All Status</option>
+              <option value="Completed">Completed</option>
+              <option value="Pending">Pending</option>
+              <option value="Failed">Failed</option>
+            </select>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Date</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Description</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Type</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Amount</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Status</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="p-8 text-center text-slate-500">
+                      No transactions found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTransactions.map((txn) => (
+                    <tr
+                      key={txn.id}
+                      className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                    >
+                      <td className="p-3 text-sm text-slate-700">{txn.date}</td>
+                      <td className="p-3 text-sm text-slate-700 font-medium">{txn.description}</td>
+                      <td className="p-3">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                            txn.type === 'Income'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-sm">
+                            {txn.type === 'Income' ? 'arrow_downward' : 'arrow_upward'}
+                          </span>
+                          {txn.type}
+                        </span>
+                      </td>
+                      <td className="p-3 text-sm font-semibold text-slate-900">
+                        {formatCurrency(txn.amount)}
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(txn.status)}`}>
+                          {txn.status}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditTransaction(txn)}
+                            className="p-1 hover:bg-slate-200 rounded transition-colors"
+                            title="Edit"
+                          >
+                            <span className="material-symbols-outlined text-slate-600 text-xl">
+                              edit
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(txn)}
+                            className="p-1 hover:bg-red-100 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <span className="material-symbols-outlined text-red-600 text-xl">
+                              delete
+                            </span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-200">
+            <span className="text-sm text-slate-500">
+              Showing {filteredTransactions.length} of {transactions.length} transactions
+            </span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg">
+                {currentPage}
+              </button>
+              <button className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                2
+              </button>
+              <button 
+                onClick={() => setCurrentPage(currentPage + 1)}
+                className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Expense Categories */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">Expense Categories</h3>
+          <div className="space-y-4">
+            {expenseCategoriesData.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">
+                No expense data available
+              </p>
+            ) : (
+              expenseCategoriesData.map((expense, index) => (
+                <div key={index}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-slate-700">{expense.category}</span>
+                    <span className="text-sm font-semibold text-slate-900">{expense.amount}</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div
+                      className="bg-indigo-600 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${expense.percentage}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-xs text-slate-500 mt-1">{expense.percentage}% of total</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Profit & Loss Summary */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+        <h3 className="text-lg font-semibold text-slate-900 mb-6">Profit & Loss Summary</h3>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* Income Total */}
+          <div className="p-6 bg-green-50 border border-green-200 rounded-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 bg-green-500/10 rounded-lg">
+                <span className="material-symbols-outlined text-green-600 text-2xl">
+                  arrow_downward
+                </span>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Income Total</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {formatCurrency(totalIncome)}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2 mt-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Completed</span>
+                <span className="font-semibold text-slate-900">
+                  {transactions.filter(t => t.type === 'Income' && t.status === 'Completed').length}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Pending</span>
+                <span className="font-semibold text-slate-900">
+                  {transactions.filter(t => t.type === 'Income' && t.status === 'Pending').length}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Expense Total */}
+          <div className="p-6 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 bg-red-500/10 rounded-lg">
+                <span className="material-symbols-outlined text-red-600 text-2xl">
+                  arrow_upward
+                </span>
+              </div>
+              <div>
+                <p className="text-sm text-slate-600 font-medium">Expense Total</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {formatCurrency(totalExpenses)}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2 mt-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Completed</span>
+                <span className="font-semibold text-slate-900">
+                  {transactions.filter(t => t.type === 'Expense' && t.status === 'Completed').length}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Categories</span>
+                <span className="font-semibold text-slate-900">
+                  {expenseCategoriesData.length}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Net Result */}
+        <div className="mt-6 p-6 bg-blue-50 border-2 border-blue-500 rounded-xl">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-500/10 rounded-lg">
+                <span className="material-symbols-outlined text-blue-600 text-2xl">
+                  account_balance
+                </span>
+              </div>
+              <div>
+                <p className="text-sm text-slate-600 font-medium">
+                  Net {netProfit >= 0 ? 'Profit' : 'Loss'}
+                </p>
+                <p className={`text-3xl font-bold ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  {formatCurrency(netProfit)}
+                </p>
+              </div>
+            </div>
+            <div className="text-left sm:text-right">
+              <p className="text-sm text-slate-600">Profit Margin</p>
+              <p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                {totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : '0.0'}%
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ADD/EDIT TRANSACTION MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white p-5 border-b border-slate-200 flex items-center justify-between z-10">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {isEditMode 
+                    ? `Edit ${modalType === 'income' ? 'Income' : 'Expense'}` 
+                    : `Add ${modalType === 'income' ? 'Income' : 'Expense'}`
+                  }
+                </h2>
+                <p className="text-sm text-slate-600 mt-1">
+                  {isEditMode ? 'Update the transaction details below' : 'Fill in the transaction details'}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="p-2 hover:bg-slate-100:bg-slate-700 rounded-lg transition-colors"
+              >
+                <span className="material-symbols-outlined text-slate-600">close</span>
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmitForm} className="p-5 space-y-5 overflow-y-auto">
+              
+              {/* Date and Type - Side by Side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="date"
+                    value={formData.date}
+                    onChange={handleInputChange}
+                    max={new Date().toISOString().split('T')[0]}
+                    className={`w-full px-4 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                      formErrors.date 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-slate-200 focus:ring-primary/50'
+                    }`}
+                  />
+                  {formErrors.date && (
+                    <p className="mt-1 text-sm text-red-500">{formErrors.date}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Type
+                  </label>
+                  <select
+                    name="type"
+                    value={formData.type}
+                    onChange={handleInputChange}
+                    disabled
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-900 focus:outline-none cursor-not-allowed"
+                  >
+                    <option value="Income">Income</option>
+                    <option value="Expense">Expense</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Description <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder={modalType === 'income' ? 'e.g., Trip payment - ABC Logistics' : 'e.g., Fuel - HP Petrol Pump'}
+                  className={`w-full px-4 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                    formErrors.description 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-slate-200 focus:ring-primary/50'
+                  }`}
+                />
+                {formErrors.description && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.description}</p>
+                )}
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                    formErrors.category 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-slate-200 focus:ring-primary/50'
+                  }`}
+                >
+                  <option value="">Select a category</option>
+                  {(modalType === 'income' ? incomeCategoryOptions : expenseCategoryOptions).map((cat, idx) => (
+                    <option key={idx} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                {formErrors.category && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.category}</p>
+                )}
+              </div>
+
+              {/* Amount and Status - Side by Side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Amount (₹) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="amount"
+                    value={formData.amount}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className={`w-full px-4 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                      formErrors.amount 
+                        ? 'border-red-500 focus:ring-red-500' 
+                        : 'border-slate-200 focus:ring-primary/50'
+                    }`}
+                  />
+                  {formErrors.amount && (
+                    <p className="mt-1 text-sm text-red-500">{formErrors.amount}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="Completed">Completed</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Failed">Failed</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex items-center gap-3 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100:bg-slate-700 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors font-medium ${
+                    modalType === 'income' ? 'bg-green-600' : 'bg-red-600'
+                  }`}
+                >
+                  {isEditMode ? 'Update Transaction' : 'Add Transaction'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+};
+
+export default AccountsFinance;
