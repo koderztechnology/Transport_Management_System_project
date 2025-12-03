@@ -12,17 +12,17 @@ import {
   Bar,
   CartesianGrid,
 } from "recharts";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 export default function TransportFuelTollPage() {
   const [fuelData, setFuelData] = useState([
-    { id: 1, vehicle: "MH12AB1234", litres: 45, pricePerLitre: 98.5, date: "2025-11-01" },
-    { id: 2, vehicle: "MH12CD5678", litres: 30, pricePerLitre: 100.0, date: "2025-11-05" },
+    { id: 1, vehicle: "MH12AB1234", litres: 45, pricePerLitre: 98.5, date: "2025-11-01", photo: null },
+    { id: 2, vehicle: "MH12CD5678", litres: 30, pricePerLitre: 100.0, date: "2025-11-05", photo: null },
   ]);
 
   const [tollData, setTollData] = useState([
-    { id: 1, vehicle: "MH12AB1234", tollName: "Expressway Toll", amount: 250, date: "2025-11-03" },
-    { id: 2, vehicle: "MH12CD5678", tollName: "Bridge Toll", amount: 120, date: "2025-11-06" },
+    { id: 1, vehicle: "MH12AB1234", tollName: "Expressway Toll", amount: 250, date: "2025-11-03", photo: null },
+    { id: 2, vehicle: "MH12CD5678", tollName: "Bridge Toll", amount: 120, date: "2025-11-06", photo: null },
   ]);
 
   const [showAddFuel, setShowAddFuel] = useState(false);
@@ -30,8 +30,22 @@ export default function TransportFuelTollPage() {
   const [editingFuelId, setEditingFuelId] = useState(null);
   const [editingTollId, setEditingTollId] = useState(null);
 
-  const [newFuel, setNewFuel] = useState({ vehicle: "", litres: "", pricePerLitre: "", date: "" });
-  const [newToll, setNewToll] = useState({ vehicle: "", tollName: "", amount: "", date: "" });
+  const [newFuel, setNewFuel] = useState({
+    vehicle: "",
+    litres: "",
+    pricePerLitre: "",
+    date: "",
+    photo: null,
+  });
+
+  const [newToll, setNewToll] = useState({
+    vehicle: "",
+    tollName: "",
+    amount: "",
+    date: "",
+    photo: null,
+  });
+
   const [filterDates, setFilterDates] = useState({ start: "", end: "" });
 
   const totalFuelCost = fuelData.reduce((s, f) => s + f.litres * f.pricePerLitre, 0);
@@ -44,14 +58,23 @@ export default function TransportFuelTollPage() {
     e.preventDefault();
     if (!newFuel.vehicle || !newFuel.litres || !newFuel.pricePerLitre || !newFuel.date) return;
 
+    const payload = {
+      ...newFuel,
+      litres: +newFuel.litres,
+      pricePerLitre: +newFuel.pricePerLitre,
+    };
+
     if (editingFuelId) {
-      setFuelData(fuelData.map(f => f.id === editingFuelId ? { ...f, ...newFuel, litres: +newFuel.litres, pricePerLitre: +newFuel.pricePerLitre } : f));
+      setFuelData((prev) =>
+        prev.map((f) => (f.id === editingFuelId ? { ...f, ...payload } : f))
+      );
       setEditingFuelId(null);
     } else {
       const id = fuelData.length ? fuelData[fuelData.length - 1].id + 1 : 1;
-      setFuelData([...fuelData, { id, ...newFuel, litres: +newFuel.litres, pricePerLitre: +newFuel.pricePerLitre }]);
+      setFuelData((prev) => [...prev, { id, ...payload }]);
     }
-    setNewFuel({ vehicle: "", litres: "", pricePerLitre: "", date: "" });
+
+    setNewFuel({ vehicle: "", litres: "", pricePerLitre: "", date: "", photo: null });
     setShowAddFuel(false);
   };
 
@@ -60,46 +83,75 @@ export default function TransportFuelTollPage() {
     e.preventDefault();
     if (!newToll.vehicle || !newToll.tollName || !newToll.amount || !newToll.date) return;
 
+    const payload = {
+      ...newToll,
+      amount: +newToll.amount,
+    };
+
     if (editingTollId) {
-      setTollData(tollData.map(t => t.id === editingTollId ? { ...t, ...newToll, amount: +newToll.amount } : t));
+      setTollData((prev) =>
+        prev.map((t) => (t.id === editingTollId ? { ...t, ...payload } : t))
+      );
       setEditingTollId(null);
     } else {
       const id = tollData.length ? tollData[tollData.length - 1].id + 1 : 1;
-      setTollData([...tollData, { id, ...newToll, amount: +newToll.amount }]);
+      setTollData((prev) => [...prev, { id, ...payload }]);
     }
-    setNewToll({ vehicle: "", tollName: "", amount: "", date: "" });
+
+    setNewToll({ vehicle: "", tollName: "", amount: "", date: "", photo: null });
     setShowAddToll(false);
   };
 
-  const deleteFuel = (id) => setFuelData(fuelData.filter(f => f.id !== id));
-  const deleteToll = (id) => setTollData(tollData.filter(t => t.id !== id));
+  const deleteFuel = (id) => setFuelData((prev) => prev.filter((f) => f.id !== id));
+  const deleteToll = (id) => setTollData((prev) => prev.filter((t) => t.id !== id));
 
   const editFuel = (f) => {
-    setNewFuel({ ...f });
+    setNewFuel({
+      vehicle: f.vehicle,
+      litres: f.litres,
+      pricePerLitre: f.pricePerLitre,
+      date: f.date,
+      photo: f.photo || null,
+    });
     setEditingFuelId(f.id);
     setShowAddFuel(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
   const editToll = (t) => {
-    setNewToll({ ...t });
+    setNewToll({
+      vehicle: t.vehicle,
+      tollName: t.tollName,
+      amount: t.amount,
+      date: t.date,
+      photo: t.photo || null,
+    });
     setEditingTollId(t.id);
     setShowAddToll(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const filterDataByDate = (data) => {
     if (!filterDates.start || !filterDates.end) return data;
-    return data.filter((item) => item.date >= filterDates.start && item.date <= filterDates.end);
+    return data.filter(
+      (item) => item.date >= filterDates.start && item.date <= filterDates.end
+    );
   };
+
   const filteredFuel = filterDataByDate(fuelData);
   const filteredToll = filterDataByDate(tollData);
 
   const barData = useMemo(() => {
-    const allDates = [...new Set([...fuelData.map(f => f.date), ...tollData.map(t => t.date)])].sort();
-    return allDates.map(date => ({
+    const allDates = [...new Set([...fuelData.map((f) => f.date), ...tollData.map((t) => t.date)])].sort();
+    return allDates.map((date) => ({
       date,
-      Fuel: fuelData.filter(f => f.date === date).reduce((s, f) => s + f.litres * f.pricePerLitre, 0),
-      Toll: tollData.filter(t => t.date === date).reduce((s, t) => s + t.amount, 0),
+      Fuel: fuelData
+        .filter((f) => f.date === date)
+        .reduce((s, f) => s + f.litres * f.pricePerLitre, 0),
+      Toll: tollData.filter((t) => t.date === date).reduce((s, t) => s + t.amount, 0),
     }));
   }, [fuelData, tollData]);
+
   const pieData = [
     { name: "Fuel Cost", value: totalFuelCost },
     { name: "Toll Cost", value: totalToll },
@@ -108,9 +160,10 @@ export default function TransportFuelTollPage() {
 
   const exportReport = () => {
     const rows = [["Type", "Vehicle", "Litres/Amount", "Price/L", "Date"]];
-    fuelData.forEach(f => rows.push(["Fuel", f.vehicle, f.litres, f.pricePerLitre, f.date]));
-    tollData.forEach(t => rows.push(["Toll", t.vehicle, t.amount, "", t.date]));
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+    fuelData.forEach((f) => rows.push(["Fuel", f.vehicle, f.litres, f.pricePerLitre, f.date]));
+    tollData.forEach((t) => rows.push(["Toll", t.vehicle, t.amount, "", t.date]));
+    const csvContent =
+      "data:text/csv;charset=utf-8," + rows.map((e) => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -118,6 +171,20 @@ export default function TransportFuelTollPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const renderPhotoPreview = (photo) => {
+    if (!photo) return null;
+    const src = typeof photo === "string" ? photo : URL.createObjectURL(photo);
+    return (
+      <div className="mt-1">
+        <img
+          src={src}
+          alt="Bill preview"
+          className="h-16 w-auto rounded-md border border-slate-200 object-cover"
+        />
+      </div>
+    );
   };
 
   return (
@@ -129,7 +196,9 @@ export default function TransportFuelTollPage() {
             <h1 className="text-3xl font-bold text-slate-900">
               Fuel & Toll Management
             </h1>
-            <p className="text-sm text-slate-500 mt-2">Monitor and track fuel consumption and toll expenses efficiently</p>
+            <p className="text-sm text-slate-500 mt-2">
+              Monitor and track fuel consumption and toll expenses efficiently
+            </p>
           </div>
           <button
             onClick={exportReport}
@@ -143,24 +212,55 @@ export default function TransportFuelTollPage() {
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
-            { title: "Total Fuel Cost", value: `₹${totalFuelCost.toFixed(0)}`, icon: "local_gas_station", color: "text-blue-600", bg: "bg-blue-500/10", trend: "+12.5%" },
-            { title: "Total Toll Paid", value: `₹${totalToll}`, icon: "toll", color: "text-orange-600", bg: "bg-orange-500/10", trend: "+8.2%" },
-            { title: "Avg Fuel Price", value: `₹${avgFuelPrice}/L`, icon: "monitoring", color: "text-emerald-600", bg: "bg-emerald-500/10", trend: "-2.1%" },
+            {
+              title: "Total Fuel Cost",
+              value: `₹${totalFuelCost.toFixed(0)}`,
+              icon: "local_gas_station",
+              color: "text-blue-600",
+              bg: "bg-blue-500/10",
+              trend: "+12.5%",
+            },
+            {
+              title: "Total Toll Paid",
+              value: `₹${totalToll}`,
+              icon: "toll",
+              color: "text-orange-600",
+              bg: "bg-orange-500/10",
+              trend: "+8.2%",
+            },
+            {
+              title: "Avg Fuel Price",
+              value: `₹${avgFuelPrice}/L`,
+              icon: "monitoring",
+              color: "text-emerald-600",
+              bg: "bg-emerald-500/10",
+              trend: "-2.1%",
+            },
           ].map((card, i) => (
-            <motion.div 
-              key={i} 
-              whileHover={{ y: -3, scale: 1.01 }} 
+            <motion.div
+              key={i}
+              whileHover={{ y: -3, scale: 1.01 }}
               className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 hover:shadow-lg hover:border-slate-300 transition-all duration-300"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className={`p-3 rounded-xl ${card.bg}`}>
-                  <span className={`material-symbols-outlined text-[26px] ${card.color}`}>{card.icon}</span>
+                  <span
+                    className={`material-symbols-outlined text-[26px] ${card.color}`}
+                  >
+                    {card.icon}
+                  </span>
                 </div>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${i === 2 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                    i === 2 ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
+                  }`}
+                >
                   {card.trend}
                 </span>
               </div>
-              <p className="text-sm font-medium text-slate-500 mb-1">{card.title}</p>
+              <p className="text-sm font-medium text-slate-500 mb-1">
+                {card.title}
+              </p>
               <p className="text-3xl font-bold text-slate-900">{card.value}</p>
             </motion.div>
           ))}
@@ -168,10 +268,15 @@ export default function TransportFuelTollPage() {
 
         {/* CHARTS */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* PIE */}
           <div className="bg-white rounded-2xl p-7 shadow-sm border border-slate-200/60 hover:shadow-md transition-all">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Expense Breakdown</h2>
-              <p className="text-sm text-slate-500">Distribution of fuel vs toll costs</p>
+              <h2 className="text-xl font-bold text-slate-900 mb-1">
+                Expense Breakdown
+              </h2>
+              <p className="text-sm text-slate-500">
+                Distribution of fuel vs toll costs
+              </p>
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -181,18 +286,20 @@ export default function TransportFuelTollPage() {
                   cy="50%"
                   outerRadius={100}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) =>
+                    `${name} ${(percent * 100).toFixed(0)}%`
+                  }
                 >
                   {pieData.map((entry, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    backgroundColor: "#fff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                 />
                 <Legend />
@@ -200,31 +307,36 @@ export default function TransportFuelTollPage() {
             </ResponsiveContainer>
           </div>
 
+          {/* BAR */}
           <div className="bg-white rounded-2xl p-7 shadow-sm border border-slate-200/60 hover:shadow-md transition-all">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Daily Expense Comparison</h2>
-              <p className="text-sm text-slate-500">Fuel and toll expenses over time</p>
+              <h2 className="text-xl font-bold text-slate-900 mb-1">
+                Daily Expense Comparison
+              </h2>
+              <p className="text-sm text-slate-500">
+                Fuel and toll expenses over time
+              </p>
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={barData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   stroke="#64748b"
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  axisLine={{ stroke: '#e5e7eb' }}
+                  tick={{ fontSize: 12, fill: "#64748b" }}
+                  axisLine={{ stroke: "#e5e7eb" }}
                 />
-                <YAxis 
+                <YAxis
                   stroke="#64748b"
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  axisLine={{ stroke: '#e5e7eb' }}
+                  tick={{ fontSize: 12, fill: "#64748b" }}
+                  axisLine={{ stroke: "#e5e7eb" }}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    backgroundColor: "#fff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                 />
                 <Legend />
@@ -241,132 +353,238 @@ export default function TransportFuelTollPage() {
             <div>
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3 mb-1">
                 <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <span className="material-symbols-outlined text-[22px] text-blue-600">local_gas_station</span>
+                  <span className="material-symbols-outlined text-[22px] text-blue-600">
+                    local_gas_station
+                  </span>
                 </div>
                 Fuel Transactions
               </h2>
-              <p className="text-sm text-slate-500">Manage fuel purchases and consumption</p>
+              <p className="text-sm text-slate-500">
+                Manage fuel purchases and consumption
+              </p>
             </div>
-            <button 
-              onClick={() => setShowAddFuel(!showAddFuel)} 
+            <button
+              onClick={() => setShowAddFuel(!showAddFuel)}
               className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md text-sm font-semibold"
             >
-              <span className="material-symbols-outlined text-[18px]">{showAddFuel ? "close" : "add"}</span>
+              <span className="material-symbols-outlined text-[18px]">
+                {showAddFuel ? "close" : "add"}
+              </span>
               {showAddFuel ? "Cancel" : "Add Entry"}
             </button>
           </div>
 
           <div className="p-7 pt-6">
+            {/* BETTER DESIGNED FUEL FORM (FORM STYLE, NOT TABLE) */}
             {showAddFuel && (
-              <form onSubmit={handleAddFuel} className="mb-6 p-5 bg-slate-50/50 rounded-xl border border-slate-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <input 
-                    placeholder="Vehicle Number" 
-                    value={newFuel.vehicle} 
-                    onChange={(e) => setNewFuel({ ...newFuel, vehicle: e.target.value })} 
-                    className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-white"
-                    required
-                  />
-                  <input 
-                    placeholder="Litres" 
-                    type="number" 
-                    step="0.01"
-                    value={newFuel.litres} 
-                    onChange={(e) => setNewFuel({ ...newFuel, litres: e.target.value })} 
-                    className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-white"
-                    required
-                  />
-                  <input 
-                    placeholder="Price per Litre (₹)" 
-                    type="number" 
-                    step="0.01"
-                    value={newFuel.pricePerLitre} 
-                    onChange={(e) => setNewFuel({ ...newFuel, pricePerLitre: e.target.value })} 
-                    className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-white"
-                    required
-                  />
-                  <input 
-                    type="date" 
-                    value={newFuel.date} 
-                    onChange={(e) => setNewFuel({ ...newFuel, date: e.target.value })} 
-                    className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-white"
-                    required
-                  />
-                  <button 
-                    type="submit"
-                    className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all font-semibold text-sm shadow-sm hover:shadow-md"
-                  >
-                    {editingFuelId ? "Update Entry" : "Save Entry"}
-                  </button>
+              <form
+                onSubmit={handleAddFuel}
+                className="mb-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm"
+              >
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">
+                  {editingFuelId ? "Edit Fuel Entry" : "Add Fuel Entry"}
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Vehicle Number
+                    </label>
+                    <input
+                      placeholder="Enter vehicle number"
+                      value={newFuel.vehicle}
+                      onChange={(e) =>
+                        setNewFuel({ ...newFuel, vehicle: e.target.value })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Litres
+                    </label>
+                    <input
+                      placeholder="Enter litres"
+                      type="number"
+                      step="0.01"
+                      value={newFuel.litres}
+                      onChange={(e) =>
+                        setNewFuel({ ...newFuel, litres: e.target.value })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Price per Litre (₹)
+                    </label>
+                    <input
+                      placeholder="Enter price per litre"
+                      type="number"
+                      step="0.01"
+                      value={newFuel.pricePerLitre}
+                      onChange={(e) =>
+                        setNewFuel({
+                          ...newFuel,
+                          pricePerLitre: e.target.value,
+                        })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={newFuel.date}
+                      onChange={(e) =>
+                        setNewFuel({ ...newFuel, date: e.target.value })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Upload Bill Photo
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setNewFuel({
+                          ...newFuel,
+                          photo: e.target.files && e.target.files[0],
+                        })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-50 cursor-pointer"
+                    />
+                    {renderPhotoPreview(newFuel.photo)}
+                  </div>
                 </div>
+
+                <button
+                  type="submit"
+                  className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700"
+                >
+                  {editingFuelId ? "Update Entry" : "Save Entry"}
+                </button>
               </form>
             )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50/80">
-                <tr>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">#</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Vehicle</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Litres</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Price/L</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Date</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Total</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredFuel.length === 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50/80">
                   <tr>
-                    <td colSpan="7" className="py-16 text-center">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="p-4 bg-slate-100 rounded-full mb-3">
-                          <span className="material-symbols-outlined text-5xl text-slate-400">local_gas_station</span>
-                        </div>
-                        <p className="text-slate-500 font-medium">No fuel transactions found</p>
-                        <p className="text-slate-400 text-sm mt-1">Add your first fuel entry to get started</p>
-                      </div>
-                    </td>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      #
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Vehicle
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Litres
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Price/L
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Date
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Total
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Actions
+                    </th>
                   </tr>
-                ) : (
-                  filteredFuel.map((row, idx) => (
-                    <tr key={row.id} className="hover:bg-slate-50/70 transition-colors group">
-                      <td className="py-4 px-6 text-slate-600 font-medium">{idx + 1}</td>
-                      <td className="py-4 px-6">
-                        <span className="font-semibold text-slate-900 px-3 py-1 bg-slate-100 rounded-md">{row.vehicle}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="font-bold text-blue-600">{row.litres}L</span>
-                      </td>
-                      <td className="py-4 px-6 text-slate-700 font-medium">₹{row.pricePerLitre}</td>
-                      <td className="py-4 px-6 text-slate-600">{row.date}</td>
-                      <td className="py-4 px-6">
-                        <span className="font-bold text-slate-900">₹{(row.litres * row.pricePerLitre).toFixed(2)}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex gap-2 transition-opacity">
-                          <button 
-                            onClick={() => editFuel(row)} 
-                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                            title="Edit"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>
-                          <button 
-                            onClick={() => deleteFuel(row.id)} 
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                            title="Delete"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                          </button>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredFuel.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="py-16 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="p-4 bg-slate-100 rounded-full mb-3">
+                            <span className="material-symbols-outlined text-5xl text-slate-400">
+                              local_gas_station
+                            </span>
+                          </div>
+                          <p className="text-slate-500 font-medium">
+                            No fuel transactions found
+                          </p>
+                          <p className="text-slate-400 text-sm mt-1">
+                            Add your first fuel entry to get started
+                          </p>
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    filteredFuel.map((row, idx) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-slate-50/70 transition-colors group"
+                      >
+                        <td className="py-4 px-6 text-slate-600 font-medium">
+                          {idx + 1}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="font-semibold text-slate-900 px-3 py-1 bg-slate-100 rounded-md">
+                            {row.vehicle}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="font-bold text-blue-600">
+                            {row.litres}L
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-slate-700 font-medium">
+                          ₹{row.pricePerLitre}
+                        </td>
+                        <td className="py-4 px-6 text-slate-600">
+                          {row.date}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="font-bold text-slate-900">
+                            ₹{(row.litres * row.pricePerLitre).toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex gap-2 transition-opacity">
+                            <button
+                              onClick={() => editFuel(row)}
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              title="Edit"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                edit
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => deleteFuel(row.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title="Delete"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                delete
+                              </span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -376,129 +594,227 @@ export default function TransportFuelTollPage() {
             <div>
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3 mb-1">
                 <div className="p-2 bg-orange-500/10 rounded-lg">
-                  <span className="material-symbols-outlined text-[22px] text-orange-600">toll</span>
+                  <span className="material-symbols-outlined text-[22px] text-orange-600">
+                    toll
+                  </span>
                 </div>
                 Toll Transactions
               </h2>
-              <p className="text-sm text-slate-500">Track toll payments and gate expenses</p>
+              <p className="text-sm text-slate-500">
+                Track toll payments and gate expenses
+              </p>
             </div>
-            <button 
-              onClick={() => setShowAddToll(!showAddToll)} 
+            <button
+              onClick={() => setShowAddToll(!showAddToll)}
               className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md text-sm font-semibold"
             >
-              <span className="material-symbols-outlined text-[18px]">{showAddToll ? "close" : "add"}</span>
+              <span className="material-symbols-outlined text-[18px]">
+                {showAddToll ? "close" : "add"}
+              </span>
               {showAddToll ? "Cancel" : "Add Entry"}
             </button>
           </div>
 
           <div className="p-7 pt-6">
+            {/* BETTER DESIGNED TOLL FORM */}
             {showAddToll && (
-              <form onSubmit={handleAddToll} className="mb-6 p-5 bg-slate-50/50 rounded-xl border border-slate-200">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <input 
-                    placeholder="Vehicle Number" 
-                    value={newToll.vehicle} 
-                    onChange={(e) => setNewToll({ ...newToll, vehicle: e.target.value })} 
-                    className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-white"
-                    required
-                  />
-                  <input 
-                    placeholder="Toll Name" 
-                    value={newToll.tollName} 
-                    onChange={(e) => setNewToll({ ...newToll, tollName: e.target.value })} 
-                    className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-white"
-                    required
-                  />
-                  <input 
-                    placeholder="Amount (₹)" 
-                    type="number" 
-                    step="0.01"
-                    value={newToll.amount} 
-                    onChange={(e) => setNewToll({ ...newToll, amount: e.target.value })} 
-                    className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-white"
-                    required
-                  />
-                  <input 
-                    type="date" 
-                    value={newToll.date} 
-                    onChange={(e) => setNewToll({ ...newToll, date: e.target.value })} 
-                    className="px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-sm bg-white"
-                    required
-                  />
-                  <button 
-                    type="submit"
-                    className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all font-semibold text-sm shadow-sm hover:shadow-md"
-                  >
-                    {editingTollId ? "Update Entry" : "Save Entry"}
-                  </button>
+              <form
+                onSubmit={handleAddToll}
+                className="mb-6 p-6 bg-white rounded-xl border border-slate-200 shadow-sm"
+              >
+                <h3 className="text-lg font-semibold text-slate-800 mb-4">
+                  {editingTollId ? "Edit Toll Entry" : "Add Toll Entry"}
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Vehicle Number
+                    </label>
+                    <input
+                      placeholder="Enter vehicle number"
+                      value={newToll.vehicle}
+                      onChange={(e) =>
+                        setNewToll({ ...newToll, vehicle: e.target.value })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Toll Name
+                    </label>
+                    <input
+                      placeholder="Enter toll name"
+                      value={newToll.tollName}
+                      onChange={(e) =>
+                        setNewToll({ ...newToll, tollName: e.target.value })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Amount (₹)
+                    </label>
+                    <input
+                      placeholder="Enter amount"
+                      type="number"
+                      step="0.01"
+                      value={newToll.amount}
+                      onChange={(e) =>
+                        setNewToll({ ...newToll, amount: e.target.value })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={newToll.date}
+                      onChange={(e) =>
+                        setNewToll({ ...newToll, date: e.target.value })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-600">
+                      Upload Toll Receipt
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setNewToll({
+                          ...newToll,
+                          photo: e.target.files && e.target.files[0],
+                        })
+                      }
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-50 cursor-pointer"
+                    />
+                    {renderPhotoPreview(newToll.photo)}
+                  </div>
                 </div>
+
+                <button
+                  type="submit"
+                  className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700"
+                >
+                  {editingTollId ? "Update Entry" : "Save Entry"}
+                </button>
               </form>
             )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50/80">
-                <tr>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">#</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Vehicle</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Toll Name</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Date</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Amount</th>
-                  <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredToll.length === 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50/80">
                   <tr>
-                    <td colSpan="6" className="py-16 text-center">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="p-4 bg-slate-100 rounded-full mb-3">
-                          <span className="material-symbols-outlined text-5xl text-slate-400">toll</span>
-                        </div>
-                        <p className="text-slate-500 font-medium">No toll transactions found</p>
-                        <p className="text-slate-400 text-sm mt-1">Add your first toll entry to get started</p>
-                      </div>
-                    </td>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      #
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Vehicle
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Toll Name
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Date
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Amount
+                    </th>
+                    <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
+                      Actions
+                    </th>
                   </tr>
-                ) : (
-                  filteredToll.map((row, idx) => (
-                    <tr key={row.id} className="hover:bg-slate-50/70 transition-colors group">
-                      <td className="py-4 px-6 text-slate-600 font-medium">{idx + 1}</td>
-                      <td className="py-4 px-6">
-                        <span className="font-semibold text-slate-900 px-3 py-1 bg-slate-100 rounded-md">{row.vehicle}</span>
-                      </td>
-                      <td className="py-4 px-6 text-slate-700 font-medium">{row.tollName}</td>
-                      <td className="py-4 px-6 text-slate-600">{row.date}</td>
-                      <td className="py-4 px-6">
-                        <span className="font-bold text-orange-600">₹{row.amount}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex gap-2 transition-opacity">
-                          <button 
-                            onClick={() => editToll(row)} 
-                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                            title="Edit"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>
-                          <button 
-                            onClick={() => deleteToll(row.id)} 
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                            title="Delete"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
-                          </button>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredToll.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="py-16 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="p-4 bg-slate-100 rounded-full mb-3">
+                            <span className="material-symbols-outlined text-5xl text-slate-400">
+                              toll
+                            </span>
+                          </div>
+                          <p className="text-slate-500 font-medium">
+                            No toll transactions found
+                          </p>
+                          <p className="text-slate-400 text-sm mt-1">
+                            Add your first toll entry to get started
+                          </p>
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    filteredToll.map((row, idx) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-slate-50/70 transition-colors group"
+                      >
+                        <td className="py-4 px-6 text-slate-600 font-medium">
+                          {idx + 1}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="font-semibold text-slate-900 px-3 py-1 bg-slate-100 rounded-md">
+                            {row.vehicle}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-slate-700 font-medium">
+                          {row.tollName}
+                        </td>
+                        <td className="py-4 px-6 text-slate-600">
+                          {row.date}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="font-bold text-orange-600">
+                            ₹{row.amount}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex gap-2 transition-opacity">
+                            <button
+                              onClick={() => editToll(row)}
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              title="Edit"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                edit
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => deleteToll(row.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              title="Delete"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                delete
+                              </span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
-
       </div>
     </div>
   );

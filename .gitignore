@@ -1,4 +1,6 @@
-# Logs
+# -------------------------------------------------------
+# LOG FILES
+# -------------------------------------------------------
 logs
 *.log
 npm-debug.log*
@@ -7,18 +9,82 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# -------------------------------------------------------
+# NODE / FRONTEND
+# -------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
 *.local
 
-# Editor directories and files
+# Vite cache
+.vite/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# -------------------------------------------------------
+# PYTHON / DJANGO
+# -------------------------------------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+env/
+venv/
+ENV/
+
+# Django media uploads (user uploaded files)
+media/
+backend/TMS_project/media/
+
+# Django static files (if generated)
+staticfiles/
+static/
+
+# SQLite (if used)
+db.sqlite3
+
+# -------------------------------------------------------
+# DJANGO MIGRATIONS CACHE
+# -------------------------------------------------------
+**/migrations/__pycache__/
+**/__pycache__/
+
+# -------------------------------------------------------
+# EDITOR / OS FILES
+# -------------------------------------------------------
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
+
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# -------------------------------------------------------
+# BUILD / TEMP FILES
+# -------------------------------------------------------
+*.pid
+*.seed
+*.retry
+*.bak
+*.tmp
+*.temp
+
+# -------------------------------------------------------
+# OPTIONAL
+# -------------------------------------------------------
+# If using JetBrains or VSCode local settings:
+.vscode/
+.idea/
+
