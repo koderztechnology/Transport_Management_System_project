@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   PieChart,
   Pie,
@@ -13,17 +13,18 @@ import {
   CartesianGrid,
 } from "recharts";
 import { motion } from "framer-motion";
+import axios from "axios";
+
+const BASE_URL = "http://127.0.0.1:8000/api";
+const FUEL_API_URL = `${BASE_URL}/fuel/`;
+const TOLL_API_URL = `${BASE_URL}/toll/`;
 
 export default function TransportFuelTollPage() {
-  const [fuelData, setFuelData] = useState([
-    { id: 1, vehicle: "MH12AB1234", litres: 45, pricePerLitre: 98.5, date: "2025-11-01", photo: null },
-    { id: 2, vehicle: "MH12CD5678", litres: 30, pricePerLitre: 100.0, date: "2025-11-05", photo: null },
-  ]);
-
-  const [tollData, setTollData] = useState([
-    { id: 1, vehicle: "MH12AB1234", tollName: "Expressway Toll", amount: 250, date: "2025-11-03", photo: null },
-    { id: 2, vehicle: "MH12CD5678", tollName: "Bridge Toll", amount: 120, date: "2025-11-06", photo: null },
-  ]);
+  // ------------------------------------------------------------------
+  // STATE
+  // ------------------------------------------------------------------
+  const [fuelData, setFuelData] = useState([]);
+  const [tollData, setTollData] = useState([]);
 
   const [showAddFuel, setShowAddFuel] = useState(false);
   const [showAddToll, setShowAddToll] = useState(false);
@@ -33,14 +34,14 @@ export default function TransportFuelTollPage() {
   const [newFuel, setNewFuel] = useState({
     vehicle: "",
     litres: "",
-    pricePerLitre: "",
+    price_per_litre: "",
     date: "",
     photo: null,
   });
 
   const [newToll, setNewToll] = useState({
     vehicle: "",
-    tollName: "",
+    toll_name: "",
     amount: "",
     date: "",
     photo: null,
@@ -48,89 +49,41 @@ export default function TransportFuelTollPage() {
 
   const [filterDates, setFilterDates] = useState({ start: "", end: "" });
 
-  const totalFuelCost = fuelData.reduce((s, f) => s + f.litres * f.pricePerLitre, 0);
-  const totalToll = tollData.reduce((s, t) => s + t.amount, 0);
-  const totalLitres = fuelData.reduce((s, f) => s + f.litres, 0);
+  // ------------------------------------------------------------------
+  // FETCH FROM BACKEND ON MOUNT
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    const fetchFuelAndToll = async () => {
+      try {
+        const [fuelRes, tollRes] = await Promise.all([
+          axios.get(FUEL_API_URL),
+          axios.get(TOLL_API_URL),
+        ]);
+
+        setFuelData(fuelRes.data || []);
+        setTollData(tollRes.data || []);
+      } catch (err) {
+        console.error("Error fetching fuel/toll data:", err.response?.data || err);
+      }
+    };
+
+    fetchFuelAndToll();
+  }, []);
+
+  // ------------------------------------------------------------------
+  // METRICS
+  // ------------------------------------------------------------------
+  const totalFuelCost = fuelData.reduce(
+    (s, f) => s + (Number(f.litres) || 0) * (Number(f.price_per_litre) || 0),
+    0
+  );
+  const totalToll = tollData.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const totalLitres = fuelData.reduce((s, f) => s + (Number(f.litres) || 0), 0);
   const avgFuelPrice = (totalFuelCost / Math.max(1, totalLitres)).toFixed(2);
 
-  // Add / Update Fuel
-  const handleAddFuel = (e) => {
-    e.preventDefault();
-    if (!newFuel.vehicle || !newFuel.litres || !newFuel.pricePerLitre || !newFuel.date) return;
-
-    const payload = {
-      ...newFuel,
-      litres: +newFuel.litres,
-      pricePerLitre: +newFuel.pricePerLitre,
-    };
-
-    if (editingFuelId) {
-      setFuelData((prev) =>
-        prev.map((f) => (f.id === editingFuelId ? { ...f, ...payload } : f))
-      );
-      setEditingFuelId(null);
-    } else {
-      const id = fuelData.length ? fuelData[fuelData.length - 1].id + 1 : 1;
-      setFuelData((prev) => [...prev, { id, ...payload }]);
-    }
-
-    setNewFuel({ vehicle: "", litres: "", pricePerLitre: "", date: "", photo: null });
-    setShowAddFuel(false);
-  };
-
-  // Add / Update Toll
-  const handleAddToll = (e) => {
-    e.preventDefault();
-    if (!newToll.vehicle || !newToll.tollName || !newToll.amount || !newToll.date) return;
-
-    const payload = {
-      ...newToll,
-      amount: +newToll.amount,
-    };
-
-    if (editingTollId) {
-      setTollData((prev) =>
-        prev.map((t) => (t.id === editingTollId ? { ...t, ...payload } : t))
-      );
-      setEditingTollId(null);
-    } else {
-      const id = tollData.length ? tollData[tollData.length - 1].id + 1 : 1;
-      setTollData((prev) => [...prev, { id, ...payload }]);
-    }
-
-    setNewToll({ vehicle: "", tollName: "", amount: "", date: "", photo: null });
-    setShowAddToll(false);
-  };
-
-  const deleteFuel = (id) => setFuelData((prev) => prev.filter((f) => f.id !== id));
-  const deleteToll = (id) => setTollData((prev) => prev.filter((t) => t.id !== id));
-
-  const editFuel = (f) => {
-    setNewFuel({
-      vehicle: f.vehicle,
-      litres: f.litres,
-      pricePerLitre: f.pricePerLitre,
-      date: f.date,
-      photo: f.photo || null,
-    });
-    setEditingFuelId(f.id);
-    setShowAddFuel(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const editToll = (t) => {
-    setNewToll({
-      vehicle: t.vehicle,
-      tollName: t.tollName,
-      amount: t.amount,
-      date: t.date,
-      photo: t.photo || null,
-    });
-    setEditingTollId(t.id);
-    setShowAddToll(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
+  // ------------------------------------------------------------------
+  // HELPERS
+  // ------------------------------------------------------------------
   const filterDataByDate = (data) => {
     if (!filterDates.start || !filterDates.end) return data;
     return data.filter(
@@ -142,13 +95,28 @@ export default function TransportFuelTollPage() {
   const filteredToll = filterDataByDate(tollData);
 
   const barData = useMemo(() => {
-    const allDates = [...new Set([...fuelData.map((f) => f.date), ...tollData.map((t) => t.date)])].sort();
+    const allDates = [
+      ...new Set([
+        ...fuelData.map((f) => f.date),
+        ...tollData.map((t) => t.date),
+      ]),
+    ]
+      .filter(Boolean)
+      .sort();
+
     return allDates.map((date) => ({
       date,
       Fuel: fuelData
         .filter((f) => f.date === date)
-        .reduce((s, f) => s + f.litres * f.pricePerLitre, 0),
-      Toll: tollData.filter((t) => t.date === date).reduce((s, t) => s + t.amount, 0),
+        .reduce(
+          (s, f) =>
+            s +
+            (Number(f.litres) || 0) * (Number(f.price_per_litre) || 0),
+          0
+        ),
+      Toll: tollData
+        .filter((t) => t.date === date)
+        .reduce((s, t) => s + (Number(t.amount) || 0), 0),
     }));
   }, [fuelData, tollData]);
 
@@ -160,10 +128,21 @@ export default function TransportFuelTollPage() {
 
   const exportReport = () => {
     const rows = [["Type", "Vehicle", "Litres/Amount", "Price/L", "Date"]];
-    fuelData.forEach((f) => rows.push(["Fuel", f.vehicle, f.litres, f.pricePerLitre, f.date]));
-    tollData.forEach((t) => rows.push(["Toll", t.vehicle, t.amount, "", t.date]));
+    fuelData.forEach((f) =>
+      rows.push([
+        "Fuel",
+        f.vehicle,
+        f.litres,
+        f.price_per_litre,
+        f.date,
+      ])
+    );
+    tollData.forEach((t) =>
+      rows.push(["Toll", t.vehicle, t.amount, "", t.date])
+    );
     const csvContent =
-      "data:text/csv;charset=utf-8," + rows.map((e) => e.join(",")).join("\n");
+      "data:text/csv;charset=utf-8," +
+      rows.map((e) => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -173,9 +152,20 @@ export default function TransportFuelTollPage() {
     document.body.removeChild(link);
   };
 
-  const renderPhotoPreview = (photo) => {
+  const buildPhotoSrc = (photo) => {
     if (!photo) return null;
-    const src = typeof photo === "string" ? photo : URL.createObjectURL(photo);
+    if (typeof photo === "string") {
+      // backend will return something like "/media/..."
+      if (photo.startsWith("http")) return photo;
+      return `http://127.0.0.1:8000${photo}`;
+    }
+    return URL.createObjectURL(photo);
+  };
+
+  const renderPhotoPreview = (photo) => {
+    const src = buildPhotoSrc(photo);
+    if (!src) return null;
+
     return (
       <div className="mt-1">
         <img
@@ -187,6 +177,173 @@ export default function TransportFuelTollPage() {
     );
   };
 
+  // ------------------------------------------------------------------
+  // FUEL: ADD / UPDATE
+  // ------------------------------------------------------------------
+  const handleAddFuel = async (e) => {
+    e.preventDefault();
+    if (
+      !newFuel.vehicle ||
+      !newFuel.litres ||
+      !newFuel.price_per_litre ||
+      !newFuel.date
+    )
+      return;
+
+    try {
+      const formData = new FormData();
+      formData.append("vehicle", newFuel.vehicle);
+      formData.append("litres", newFuel.litres);
+      formData.append("price_per_litre", newFuel.price_per_litre);
+      formData.append("date", newFuel.date);
+      if (newFuel.photo instanceof File) {
+        formData.append("photo", newFuel.photo);
+      }
+
+      if (editingFuelId) {
+        const res = await axios.put(
+          `${FUEL_API_URL}${editingFuelId}/`,
+          formData,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        );
+
+        setFuelData((prev) =>
+          prev.map((f) =>
+            f.fuel_id === editingFuelId ? res.data : f
+          )
+        );
+        setEditingFuelId(null);
+      } else {
+        const res = await axios.post(FUEL_API_URL, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setFuelData((prev) => [res.data, ...prev]);
+      }
+
+      setNewFuel({
+        vehicle: "",
+        litres: "",
+        price_per_litre: "",
+        date: "",
+        photo: null,
+      });
+      setShowAddFuel(false);
+    } catch (err) {
+      console.error("Error saving fuel:", err.response?.data || err);
+      alert("Error saving fuel. Check console for details.");
+    }
+  };
+
+  const deleteFuel = async (fuelId) => {
+    try {
+      await axios.delete(`${FUEL_API_URL}${fuelId}/`);
+      setFuelData((prev) => prev.filter((f) => f.fuel_id !== fuelId));
+    } catch (err) {
+      console.error("Error deleting fuel:", err.response?.data || err);
+      alert("Error deleting fuel entry.");
+    }
+  };
+
+  const editFuel = (f) => {
+    setNewFuel({
+      vehicle: f.vehicle || "",
+      litres: f.litres || "",
+      price_per_litre: f.price_per_litre || "",
+      date: f.date || "",
+      photo: f.photo || null,
+    });
+    setEditingFuelId(f.fuel_id);
+    setShowAddFuel(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ------------------------------------------------------------------
+  // TOLL: ADD / UPDATE
+  // ------------------------------------------------------------------
+  const handleAddToll = async (e) => {
+    e.preventDefault();
+    if (
+      !newToll.vehicle ||
+      !newToll.toll_name ||
+      !newToll.amount ||
+      !newToll.date
+    )
+      return;
+
+    try {
+      const formData = new FormData();
+      formData.append("vehicle", newToll.vehicle);
+      formData.append("toll_name", newToll.toll_name);
+      formData.append("amount", newToll.amount);
+      formData.append("date", newToll.date);
+      if (newToll.photo instanceof File) {
+        formData.append("photo", newToll.photo);
+      }
+
+      if (editingTollId) {
+        const res = await axios.put(
+          `${TOLL_API_URL}${editingTollId}/`,
+          formData,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        );
+
+        setTollData((prev) =>
+          prev.map((t) =>
+            t.toll_id === editingTollId ? res.data : t
+          )
+        );
+        setEditingTollId(null);
+      } else {
+        const res = await axios.post(TOLL_API_URL, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setTollData((prev) => [res.data, ...prev]);
+      }
+
+      setNewToll({
+        vehicle: "",
+        toll_name: "",
+        amount: "",
+        date: "",
+        photo: null,
+      });
+      setShowAddToll(false);
+    } catch (err) {
+      console.error("Error saving toll:", err.response?.data || err);
+      alert("Error saving toll. Check console for details.");
+    }
+  };
+
+  const deleteToll = async (tollId) => {
+    try {
+      await axios.delete(`${TOLL_API_URL}${tollId}/`);
+      setTollData((prev) => prev.filter((t) => t.toll_id !== tollId));
+    } catch (err) {
+      console.error("Error deleting toll:", err.response?.data || err);
+      alert("Error deleting toll entry.");
+    }
+  };
+
+  const editToll = (t) => {
+    setNewToll({
+      vehicle: t.vehicle || "",
+      toll_name: t.toll_name || "",
+      amount: t.amount || "",
+      date: t.date || "",
+      photo: t.photo || null,
+    });
+    setEditingTollId(t.toll_id);
+    setShowAddToll(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ------------------------------------------------------------------
+  // UI (UNCHANGED VISUALLY)
+  // ------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -204,7 +361,9 @@ export default function TransportFuelTollPage() {
             onClick={exportReport}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-all shadow-sm hover:shadow-md"
           >
-            <span className="material-symbols-outlined text-[18px]">download</span>
+            <span className="material-symbols-outlined text-[18px]">
+              download
+            </span>
             Export CSV
           </button>
         </header>
@@ -252,7 +411,9 @@ export default function TransportFuelTollPage() {
                 </div>
                 <span
                   className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    i === 2 ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
+                    i === 2
+                      ? "bg-red-50 text-red-600"
+                      : "bg-green-50 text-green-600"
                   }`}
                 >
                   {card.trend}
@@ -261,7 +422,9 @@ export default function TransportFuelTollPage() {
               <p className="text-sm font-medium text-slate-500 mb-1">
                 {card.title}
               </p>
-              <p className="text-3xl font-bold text-slate-900">{card.value}</p>
+              <p className="text-3xl font-bold text-slate-900">
+                {card.value}
+              </p>
             </motion.div>
           ))}
         </div>
@@ -291,7 +454,10 @@ export default function TransportFuelTollPage() {
                   }
                 >
                   {pieData.map((entry, index) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    <Cell
+                      key={index}
+                      fill={COLORS[index % COLORS.length]}
+                    />
                   ))}
                 </Pie>
                 <Tooltip
@@ -299,7 +465,8 @@ export default function TransportFuelTollPage() {
                     backgroundColor: "#fff",
                     border: "1px solid #e5e7eb",
                     borderRadius: "8px",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    boxShadow:
+                      "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                 />
                 <Legend />
@@ -319,7 +486,11 @@ export default function TransportFuelTollPage() {
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#e5e7eb"
+                  vertical={false}
+                />
                 <XAxis
                   dataKey="date"
                   stroke="#64748b"
@@ -336,12 +507,21 @@ export default function TransportFuelTollPage() {
                     backgroundColor: "#fff",
                     border: "1px solid #e5e7eb",
                     borderRadius: "8px",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    boxShadow:
+                      "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
                 />
                 <Legend />
-                <Bar dataKey="Fuel" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Toll" fill="#f97316" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="Fuel"
+                  fill="#2563eb"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="Toll"
+                  fill="#f97316"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -375,7 +555,7 @@ export default function TransportFuelTollPage() {
           </div>
 
           <div className="p-7 pt-6">
-            {/* BETTER DESIGNED FUEL FORM (FORM STYLE, NOT TABLE) */}
+            {/* FORM (Fuel) */}
             {showAddFuel && (
               <form
                 onSubmit={handleAddFuel}
@@ -394,7 +574,10 @@ export default function TransportFuelTollPage() {
                       placeholder="Enter vehicle number"
                       value={newFuel.vehicle}
                       onChange={(e) =>
-                        setNewFuel({ ...newFuel, vehicle: e.target.value })
+                        setNewFuel({
+                          ...newFuel,
+                          vehicle: e.target.value,
+                        })
                       }
                       className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
                       required
@@ -411,7 +594,10 @@ export default function TransportFuelTollPage() {
                       step="0.01"
                       value={newFuel.litres}
                       onChange={(e) =>
-                        setNewFuel({ ...newFuel, litres: e.target.value })
+                        setNewFuel({
+                          ...newFuel,
+                          litres: e.target.value,
+                        })
                       }
                       className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
                       required
@@ -426,11 +612,11 @@ export default function TransportFuelTollPage() {
                       placeholder="Enter price per litre"
                       type="number"
                       step="0.01"
-                      value={newFuel.pricePerLitre}
+                      value={newFuel.price_per_litre}
                       onChange={(e) =>
                         setNewFuel({
                           ...newFuel,
-                          pricePerLitre: e.target.value,
+                          price_per_litre: e.target.value,
                         })
                       }
                       className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
@@ -481,6 +667,7 @@ export default function TransportFuelTollPage() {
               </form>
             )}
 
+            {/* TABLE (Fuel) */}
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50/80">
@@ -530,7 +717,7 @@ export default function TransportFuelTollPage() {
                   ) : (
                     filteredFuel.map((row, idx) => (
                       <tr
-                        key={row.id}
+                        key={row.fuel_id}
                         className="hover:bg-slate-50/70 transition-colors group"
                       >
                         <td className="py-4 px-6 text-slate-600 font-medium">
@@ -547,14 +734,18 @@ export default function TransportFuelTollPage() {
                           </span>
                         </td>
                         <td className="py-4 px-6 text-slate-700 font-medium">
-                          ₹{row.pricePerLitre}
+                          ₹{row.price_per_litre}
                         </td>
                         <td className="py-4 px-6 text-slate-600">
                           {row.date}
                         </td>
                         <td className="py-4 px-6">
                           <span className="font-bold text-slate-900">
-                            ₹{(row.litres * row.pricePerLitre).toFixed(2)}
+                            ₹
+                            {(
+                              (Number(row.litres) || 0) *
+                              (Number(row.price_per_litre) || 0)
+                            ).toFixed(2)}
                           </span>
                         </td>
                         <td className="py-4 px-6">
@@ -569,7 +760,7 @@ export default function TransportFuelTollPage() {
                               </span>
                             </button>
                             <button
-                              onClick={() => deleteFuel(row.id)}
+                              onClick={() => deleteFuel(row.fuel_id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
                               title="Delete"
                             >
@@ -616,7 +807,7 @@ export default function TransportFuelTollPage() {
           </div>
 
           <div className="p-7 pt-6">
-            {/* BETTER DESIGNED TOLL FORM */}
+            {/* FORM (Toll) */}
             {showAddToll && (
               <form
                 onSubmit={handleAddToll}
@@ -635,7 +826,10 @@ export default function TransportFuelTollPage() {
                       placeholder="Enter vehicle number"
                       value={newToll.vehicle}
                       onChange={(e) =>
-                        setNewToll({ ...newToll, vehicle: e.target.value })
+                        setNewToll({
+                          ...newToll,
+                          vehicle: e.target.value,
+                        })
                       }
                       className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
                       required
@@ -648,9 +842,12 @@ export default function TransportFuelTollPage() {
                     </label>
                     <input
                       placeholder="Enter toll name"
-                      value={newToll.tollName}
+                      value={newToll.toll_name}
                       onChange={(e) =>
-                        setNewToll({ ...newToll, tollName: e.target.value })
+                        setNewToll({
+                          ...newToll,
+                          toll_name: e.target.value,
+                        })
                       }
                       className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
                       required
@@ -667,7 +864,10 @@ export default function TransportFuelTollPage() {
                       step="0.01"
                       value={newToll.amount}
                       onChange={(e) =>
-                        setNewToll({ ...newToll, amount: e.target.value })
+                        setNewToll({
+                          ...newToll,
+                          amount: e.target.value,
+                        })
                       }
                       className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
                       required
@@ -682,7 +882,10 @@ export default function TransportFuelTollPage() {
                       type="date"
                       value={newToll.date}
                       onChange={(e) =>
-                        setNewToll({ ...newToll, date: e.target.value })
+                        setNewToll({
+                          ...newToll,
+                          date: e.target.value,
+                        })
                       }
                       className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
                       required
@@ -717,6 +920,7 @@ export default function TransportFuelTollPage() {
               </form>
             )}
 
+            {/* TABLE (Toll) */}
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50/80">
@@ -763,7 +967,7 @@ export default function TransportFuelTollPage() {
                   ) : (
                     filteredToll.map((row, idx) => (
                       <tr
-                        key={row.id}
+                        key={row.toll_id}
                         className="hover:bg-slate-50/70 transition-colors group"
                       >
                         <td className="py-4 px-6 text-slate-600 font-medium">
@@ -775,7 +979,7 @@ export default function TransportFuelTollPage() {
                           </span>
                         </td>
                         <td className="py-4 px-6 text-slate-700 font-medium">
-                          {row.tollName}
+                          {row.toll_name}
                         </td>
                         <td className="py-4 px-6 text-slate-600">
                           {row.date}
@@ -797,7 +1001,7 @@ export default function TransportFuelTollPage() {
                               </span>
                             </button>
                             <button
-                              onClick={() => deleteToll(row.id)}
+                              onClick={() => deleteToll(row.toll_id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
                               title="Delete"
                             >
