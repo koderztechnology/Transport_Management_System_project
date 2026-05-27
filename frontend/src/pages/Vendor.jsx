@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Plus,
   Edit,
@@ -19,241 +20,20 @@ export default function VendorManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const vendorsPerPage = 10;
 
-  const [vendors, setVendors] = useState([
-    {
-      id: 1,
-      name: "Bharat Petroleum",
-      type: "Fuel",
-      contact: "Ramesh Gupta",
-      phone: "+91 98765 11111",
-      gst: "27AAAAA0000A1Z5",
-      status: "active",
-      createdAt: new Date("2025-11-02"),
-    },
-    {
-      id: 2,
-      name: "AutoCare Services",
-      type: "Maintenance",
-      contact: "Sunil Mehta",
-      phone: "+91 98765 22222",
-      gst: "27BBBBB0000B1Z5",
-      status: "active",
-      createdAt: new Date("2025-11-05"),
-    },
-    {
-      id: 3,
-      name: "Tyres & More",
-      type: "Parts",
-      contact: "Kiran Shah",
-      phone: "+91 98765 33333",
-      gst: "07CCCCC0000C1Z5",
-      status: "active",
-      createdAt: new Date("2025-10-15"),
-    },
-    {
-      id: 4,
-      name: "Highway Toll Services",
-      type: "Toll",
-      contact: "Prakash Jain",
-      phone: "+91 98765 44444",
-      gst: "-",
-      status: "inactive",
-      createdAt: new Date("2025-11-08"),
-    },
+  const [vendors, setVendors] = useState([]);
 
-    // ---- ADDING 20+ MORE DUMMY VENDORS ---- //
+  useEffect(() => {
+    fetchVendors();
+  }, []);
 
-    {
-      id: 5,
-      name: "Shell Energy India",
-      type: "Fuel",
-      contact: "Mahesh Patil",
-      phone: "+91 98765 55555",
-      gst: "29DDDDD0000D1Z5",
-      status: "active",
-      createdAt: new Date("2025-10-20"),
-    },
-    {
-      id: 6,
-      name: "Metro Auto Repairs",
-      type: "Maintenance",
-      contact: "Lokesh Thakur",
-      phone: "+91 98765 66666",
-      gst: "27EEEEE0000E1Z5",
-      status: "active",
-      createdAt: new Date("2025-09-12"),
-    },
-    {
-      id: 7,
-      name: "Prime Tyre House",
-      type: "Parts",
-      contact: "Harish Nair",
-      phone: "+91 98765 77777",
-      gst: "24FFFFF0000F1Z5",
-      status: "inactive",
-      createdAt: new Date("2025-10-25"),
-    },
-    {
-      id: 8,
-      name: "FastTrack Logistics Toll",
-      type: "Toll",
-      contact: "Ishaan Verma",
-      phone: "+91 98765 88888",
-      gst: "-",
-      status: "active",
-      createdAt: new Date("2025-11-01"),
-    },
-    {
-      id: 9,
-      name: "City Fuel Station",
-      type: "Fuel",
-      contact: "Rajesh Kumar",
-      phone: "+91 98765 99999",
-      gst: "18GGGGG0000G1Z5",
-      status: "active",
-      createdAt: new Date("2025-11-03"),
-    },
-    {
-      id: 10,
-      name: "Max Auto Garage",
-      type: "Maintenance",
-      contact: "Sameer Deshmukh",
-      phone: "+91 98654 12345",
-      gst: "27HHHHH0000H1Z5",
-      status: "inactive",
-      createdAt: new Date("2025-08-18"),
-    },
-    {
-      id: 11,
-      name: "HiGrip Tyres",
-      type: "Parts",
-      contact: "Gaurav Singh",
-      phone: "+91 98712 54321",
-      gst: "09IIIII0000I1Z5",
-      status: "active",
-      createdAt: new Date("2025-11-04"),
-    },
-    {
-      id: 12,
-      name: "Toll Master Pvt Ltd",
-      type: "Toll",
-      contact: "Mohan Kashyap",
-      phone: "+91 98000 11111",
-      gst: "-",
-      status: "inactive",
-      createdAt: new Date("2025-07-10"),
-    },
-    {
-      id: 13,
-      name: "Ultra Petrol Center",
-      type: "Fuel",
-      contact: "Sandeep Rana",
-      phone: "+91 98111 22222",
-      gst: "07JJJJJ0000J1Z5",
-      status: "active",
-      createdAt: new Date("2025-10-10"),
-    },
-    {
-      id: 14,
-      name: "Supreme Auto Clinic",
-      type: "Maintenance",
-      contact: "Vipul Sutar",
-      phone: "+91 98222 33333",
-      gst: "21KKKKK0000K1Z5",
-      status: "active",
-      createdAt: new Date("2025-11-06"),
-    },
-    {
-      id: 15,
-      name: "RoadStar Tyre Mart",
-      type: "Parts",
-      contact: "Hemant Joshi",
-      phone: "+91 98333 44444",
-      gst: "27LLLLL0000L1Z5",
-      status: "inactive",
-      createdAt: new Date("2025-09-22"),
-    },
-    {
-      id: 16,
-      name: "Golden Highway Toll",
-      type: "Toll",
-      contact: "Tarun Malhotra",
-      phone: "+91 98444 55555",
-      gst: "-",
-      status: "active",
-      createdAt: new Date("2025-11-07"),
-    },
-    {
-      id: 17,
-      name: "EcoFuel India",
-      type: "Fuel",
-      contact: "Neeraj Shinde",
-      phone: "+91 98555 66666",
-      gst: "27MMMMM0000M1Z5",
-      status: "active",
-      createdAt: new Date("2025-11-02"),
-    },
-    {
-      id: 18,
-      name: "CityFix Auto Solutions",
-      type: "Maintenance",
-      contact: "Kamlesh Chouhan",
-      phone: "+91 98666 77777",
-      gst: "23NNNNN0000N1Z5",
-      status: "inactive",
-      createdAt: new Date("2025-10-12"),
-    },
-    {
-      id: 19,
-      name: "MegaParts Zone",
-      type: "Parts",
-      contact: "Ritik Yadav",
-      phone: "+91 98777 88888",
-      gst: "27OOOOO0000O1Z5",
-      status: "active",
-      createdAt: new Date("2025-11-01"),
-    },
-    {
-      id: 20,
-      name: "QuickPay Toll Services",
-      type: "Toll",
-      contact: "Vinod Shetty",
-      phone: "+91 98888 99999",
-      gst: "-",
-      status: "active",
-      createdAt: new Date("2025-11-03"),
-    },
-    {
-      id: 21,
-      name: "Express Fuel Hub",
-      type: "Fuel",
-      contact: "Piyush Agarwal",
-      phone: "+91 98999 00000",
-      gst: "19PPPPP0000P1Z5",
-      status: "inactive",
-      createdAt: new Date("2025-10-18"),
-    },
-    {
-      id: 22,
-      name: "Allied Motor Works",
-      type: "Maintenance",
-      contact: "Jayesh Chavan",
-      phone: "+91 98123 45678",
-      gst: "27QQQQQ0000Q1Z5",
-      status: "active",
-      createdAt: new Date("2025-11-05"),
-    },
-    {
-      id: 23,
-      name: "Turbo Wheels Store",
-      type: "Parts",
-      contact: "Vishal Pandey",
-      phone: "+91 98234 56789",
-      gst: "24RRRRR0000R1Z5",
-      status: "active",
-      createdAt: new Date("2025-09-10"),
-    },
-  ]);
+  const fetchVendors = async () => {
+    try {
+      const response = await axios.get("http://127.0.0.1:8000/api/vendors/");
+      setVendors(response.data);
+    } catch (error) {
+      console.error("Error fetching vendors:", error);
+    }
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [editVendorId, setEditVendorId] = useState(null);
@@ -261,15 +41,12 @@ export default function VendorManagement() {
 
   const [newVendor, setNewVendor] = useState({
     name: "",
-    type: "",
-    contact: "",
+    service_type: "",
+    contact_person: "",
     phone: "",
-    gst: "",
     address: "",
-    city: "",
-    state: "",
     email: "",
-    status: "active",
+    status: "Active",
   });
 
   // RESET pagination when searching
@@ -278,9 +55,8 @@ export default function VendorManagement() {
     setCurrentPage(1);
   };
 
-  // FILTERED vendors
   const filteredVendors = vendors.filter((v) =>
-    v.name.toLowerCase().includes(search.toLowerCase())
+    String(v.name || "").toLowerCase().includes(search.toLowerCase())
   );
 
   // PAGINATED vendors
@@ -292,63 +68,85 @@ export default function VendorManagement() {
   const totalPages = Math.ceil(filteredVendors.length / vendorsPerPage);
 
   const totalVendors = vendors.length;
-  const activeVendors = vendors.filter((v) => v.status === "active").length;
-  const inactiveVendors = vendors.filter((v) => v.status === "inactive").length;
+  const activeVendors = vendors.filter((v) => v.status === "Active").length;
+  const inactiveVendors = vendors.filter((v) => v.status === "Inactive").length;
   const vendorsThisMonth = vendors.filter((v) => {
-    const vendorMonth = new Date(v.createdAt).getMonth();
-    const vendorYear = new Date(v.createdAt).getFullYear();
+    if(!v.added_date) return false;
+    const vendorMonth = new Date(v.added_date).getMonth();
+    const vendorYear = new Date(v.added_date).getFullYear();
     const now = new Date();
     return vendorMonth === now.getMonth() && vendorYear === now.getFullYear();
   }).length;
 
   // Save vendor (add/edit)
-  const handleSaveVendor = () => {
+  const handleSaveVendor = async () => {
     if (!newVendor.name || !newVendor.phone) return;
 
-    if (editVendorId) {
-      setVendors(
-        vendors.map((v) => (v.id === editVendorId ? { ...v, ...newVendor } : v))
-      );
-    } else {
-      setVendors([
-        ...vendors,
-        { id: Date.now(), createdAt: new Date(), ...newVendor },
-      ]);
-    }
+    // Clean payload for Django
+    const payload = { ...newVendor };
+    if (!payload.email) payload.email = null; // Prevent "Enter a valid email address" from DRF
+    delete payload.gst; // Just in case it sneaks in from edit mode old data
 
-    setNewVendor({
-      name: "",
-      type: "",
-      contact: "",
-      phone: "",
-      gst: "",
-      address: "",
-      email: "",
-      status: "active",
-    });
-    setEditVendorId(null);
-    setShowModal(false);
+    try {
+      if (editVendorId) {
+        const res = await axios.put(`http://127.0.0.1:8000/api/vendors/${editVendorId}/`, payload);
+        setVendors(
+          vendors.map((v) => (v.vendor_id === editVendorId ? res.data : v))
+        );
+      } else {
+        const res = await axios.post("http://127.0.0.1:8000/api/vendors/", payload);
+        setVendors([
+          ...vendors,
+          res.data,
+        ]);
+      }
+
+      setNewVendor({
+        name: "",
+        service_type: "",
+        contact_person: "",
+        phone: "",
+        address: "",
+        email: "",
+        status: "Active",
+      });
+      setEditVendorId(null);
+      setShowModal(false);
+    } catch (error) {
+      console.error("Error saving vendor:", error);
+    }
   };
 
   const handleEdit = (vendor) => {
     setNewVendor({ ...vendor });
-    setEditVendorId(vendor.id);
+    setEditVendorId(vendor.vendor_id);
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
-    setVendors(vendors.filter((v) => v.id !== id));
-    setShowDelete(null);
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`http://127.0.0.1:8000/api/vendors/${id}/`);
+      setVendors(vendors.filter((v) => v.vendor_id !== id));
+      setShowDelete(null);
+    } catch (error) {
+      console.error("Error deleting vendor:", error);
+    }
   };
 
-  const toggleStatus = (id) => {
-    setVendors(
-      vendors.map((v) =>
-        v.id === id
-          ? { ...v, status: v.status === "active" ? "inactive" : "active" }
-          : v
-      )
-    );
+  const toggleStatus = async (id) => {
+    const vendor = vendors.find((v) => v.vendor_id === id);
+    if(!vendor) return;
+    const updatedStatus = vendor.status === "Active" ? "Inactive" : "Active";
+    try {
+      const res = await axios.patch(`http://127.0.0.1:8000/api/vendors/${id}/`, { status: updatedStatus });
+      setVendors(
+        vendors.map((v) =>
+          v.vendor_id === id ? res.data : v
+        )
+      );
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
   };
 
   return (
@@ -443,23 +241,23 @@ export default function VendorManagement() {
 
             <tbody className="divide-y divide-slate-100">
               {paginatedVendors.map((v) => (
-                <tr key={v.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={v.vendor_id} className="hover:bg-slate-50 transition-colors">
                   <td className="py-4 px-6 font-medium text-slate-900">{v.name}</td>
-                  <td className="py-4 px-6 text-slate-600">{v.type}</td>
-                  <td className="py-4 px-6 text-slate-600">{v.contact}</td>
+                  <td className="py-4 px-6 text-slate-600">{v.service_type}</td>
+                  <td className="py-4 px-6 text-slate-600">{v.contact_person}</td>
                   <td className="py-4 px-6 text-slate-600">{v.phone}</td>
-                  <td className="py-4 px-6 text-slate-600 font-mono text-xs">{v.gst}</td>
+                  <td className="py-4 px-6 text-slate-600 font-mono text-xs">{v.email || "-"}</td>
 
                   <td className="py-4 px-6">
                     <button
-                      onClick={() => toggleStatus(v.id)}
+                      onClick={() => toggleStatus(v.vendor_id)}
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                        v.status === "active"
+                        v.status === "Active"
                           ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                           : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
                       }`}
                     >
-                      {v.status === "active" ? (
+                      {v.status === "Active" ? (
                         <>
                           <CheckCircle size={12} /> Active
                         </>
@@ -481,7 +279,7 @@ export default function VendorManagement() {
                         <Edit size={16} />
                       </button>
                       <button
-                        onClick={() => setShowDelete(v.id)}
+                        onClick={() => setShowDelete(v.vendor_id)}
                         className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
                         title="Delete"
                       >
@@ -555,8 +353,8 @@ export default function VendorManagement() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Type *</label>
                 <select
-                  value={newVendor.type}
-                  onChange={(e) => setNewVendor({ ...newVendor, type: e.target.value })}
+                  value={newVendor.service_type}
+                  onChange={(e) => setNewVendor({ ...newVendor, service_type: e.target.value })}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
                 >
                   <option value="">Select Vendor Type</option>
@@ -570,8 +368,8 @@ export default function VendorManagement() {
               <InputGroup 
                 label="Contact Person" 
                 placeholder="John Doe" 
-                value={newVendor.contact} 
-                onChange={(e) => setNewVendor({ ...newVendor, contact: e.target.value })} 
+                value={newVendor.contact_person} 
+                onChange={(e) => setNewVendor({ ...newVendor, contact_person: e.target.value })} 
               />
 
               <InputGroup 
@@ -590,29 +388,6 @@ export default function VendorManagement() {
                 />
               </div>
 
-              <InputGroup 
-                label="City" 
-                placeholder="Enter city" 
-                value={newVendor.city} 
-                onChange={(e) => setNewVendor({ ...newVendor, city: e.target.value })} 
-              />
-
-              <InputGroup 
-                label="State" 
-                placeholder="Enter state" 
-                value={newVendor.state} 
-                onChange={(e) => setNewVendor({ ...newVendor, state: e.target.value })} 
-              />
-
-              <div className="sm:col-span-2">
-                <InputGroup 
-                  label="GST Number" 
-                  placeholder="27AAAAA0000A1Z5" 
-                  value={newVendor.gst} 
-                  onChange={(e) => setNewVendor({ ...newVendor, gst: e.target.value })} 
-                />
-              </div>
-
               <div className="sm:col-span-2">
                 <InputGroup 
                   label="Email" 
@@ -623,6 +398,8 @@ export default function VendorManagement() {
                 />
               </div>
 
+              {/* Removed GST */}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
                 <select
@@ -630,8 +407,8 @@ export default function VendorManagement() {
                   onChange={(e) => setNewVendor({ ...newVendor, status: e.target.value })}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
                 >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
                 </select>
               </div>
             </div>

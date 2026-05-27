@@ -1,7 +1,6 @@
-import { useState } from 'react';
 
 const PaymentTracking = () => {
-  const [activeView, setActiveView] = useState('vendors');
+
 
   const vendorPayments = [
     { id: 'VP001', vendor: 'ABC Diesel Station', amount: 45000, dueDate: '2024-11-15', status: 'pending', category: 'Fuel' },

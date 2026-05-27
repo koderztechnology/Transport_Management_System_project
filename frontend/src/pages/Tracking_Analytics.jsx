@@ -94,8 +94,8 @@ const SAMPLE_TRIP_STATS = [
 
 export default function TrackingAnalyticsFull() {
   const [vehicles, setVehicles] = useState(SAMPLE_VEHICLES);
-  const [trips, setTrips] = useState(SAMPLE_TRIPS);
-  const [tripStats, setTripStats] = useState(SAMPLE_TRIP_STATS);
+  const [trips] = useState(SAMPLE_TRIPS);
+  const [tripStats] = useState(SAMPLE_TRIP_STATS);
   const [selectedTab, setSelectedTab] = useState("tracking"); // 'tracking' or 'analytics'
   const [focusedVehicle, setFocusedVehicle] = useState(null);
   const [alerts, setAlerts] = useState([]);
@@ -116,7 +116,7 @@ export default function TrackingAnalyticsFull() {
 
         // demo: simulate small random movement / updates on sample data
         setVehicles((prev) =>
-          prev.map((v, i) => {
+          prev.map((v) => {
             // slight random movement and speed changes
             const jitter = (Math.random() - 0.5) * 0.02;
             const newLat = v.lat + jitter;
@@ -204,7 +204,7 @@ export default function TrackingAnalyticsFull() {
     if (mapRef.current) {
       try {
         mapRef.current.flyTo([v.lat, v.lng], 12, { duration: 1.0 });
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -238,9 +238,9 @@ export default function TrackingAnalyticsFull() {
   const visibleTrips = useMemo(() => {
     const filtered = trips.filter((t) =>
       tripSearch === "" ||
-      t.id.toLowerCase().includes(tripSearch.toLowerCase()) ||
-      t.vehicle.toLowerCase().includes(tripSearch.toLowerCase()) ||
-      t.driver.toLowerCase().includes(tripSearch.toLowerCase())
+      String(t.id || "").toLowerCase().includes(tripSearch.toLowerCase()) ||
+      String(t.vehicle || "").toLowerCase().includes(tripSearch.toLowerCase()) ||
+      String(t.driver || "").toLowerCase().includes(tripSearch.toLowerCase())
     );
     const sorted = filtered.sort((a, b) => {
       const k = tripSort.key;
@@ -284,9 +284,9 @@ export default function TrackingAnalyticsFull() {
                   if (!searchVehicle) return true;
                   const q = searchVehicle.toLowerCase();
                   return (
-                    v.id.toLowerCase().includes(q) ||
-                    v.reg.toLowerCase().includes(q) ||
-                    v.driver.toLowerCase().includes(q)
+                    String(v.id || "").toLowerCase().includes(q) ||
+                    String(v.reg || "").toLowerCase().includes(q) ||
+                    String(v.driver || "").toLowerCase().includes(q)
                   );
                 })
                 .map((v) => (
@@ -373,7 +373,7 @@ export default function TrackingAnalyticsFull() {
                 className="rounded-lg"
               >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                {vehicles.map((v) => (
+                {vehicles.slice(0, 100).map((v) => (
                   <Marker
                     key={v.id}
                     position={[v.lat, v.lng]}
@@ -429,7 +429,7 @@ export default function TrackingAnalyticsFull() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="col-span-2 bg-white p-4 rounded-lg shadow">
                   <h4 className="font-medium mb-3">Weekly Trips</h4>
-                  <ResponsiveContainer width="100%" height={250}>
+                  <ResponsiveContainer width="100%" height={250} minHeight={1} minWidth={1}>
                     <BarChart data={tripStats}>
                       <XAxis dataKey="day" />
                       <YAxis />
@@ -439,8 +439,8 @@ export default function TrackingAnalyticsFull() {
                   </ResponsiveContainer>
 
                   <h4 className="font-medium mt-6 mb-3">Fuel Levels</h4>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={vehicles.map(v => ({ name: v.reg, fuel: v.fuel }))}>
+                  <ResponsiveContainer width="100%" height={200} minHeight={1} minWidth={1}>
+                    <LineChart data={vehicles.slice(0, 100).map(v => ({ name: v.reg, fuel: v.fuel }))}>
                       <XAxis dataKey="name" />
                       <YAxis />
                       <Tooltip />
@@ -856,7 +856,7 @@ export default function TrackingAnalyticsFull() {
 //                 >
 //                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-//                   {vehicles.map((v) => (
+//                   {vehicles.slice(0, 100).map((v) => (
 //                     <Marker
 //                       key={v.id}
 //                       icon={truckIcon}
@@ -913,7 +913,7 @@ export default function TrackingAnalyticsFull() {
                 
 //                 <div className="col-span-2 bg-white p-4 rounded-lg shadow-sm border border-slate-100">
 //                   <h4 className="font-medium mb-3 text-slate-700">Weekly Trips</h4>
-//                   <ResponsiveContainer width="100%" height={250}>
+//                   <ResponsiveContainer width="100%" height={250} minHeight={1} minWidth={1}>
 //                     <BarChart data={tripStats}>
 //                       <XAxis dataKey="day" />
 //                       <YAxis />
@@ -923,8 +923,8 @@ export default function TrackingAnalyticsFull() {
 //                   </ResponsiveContainer>
 
 //                   <h4 className="font-medium mt-6 mb-3 text-slate-700">Fuel Levels</h4>
-//                   <ResponsiveContainer width="100%" height={200}>
-//                     <LineChart data={vehicles.map(v => ({ name: v.reg, fuel: v.fuel }))}>
+//                   <ResponsiveContainer width="100%" height={200} minHeight={1} minWidth={1}>
+//                     <LineChart data={vehicles.slice(0, 100).map(v => ({ name: v.reg, fuel: v.fuel }))}>
 //                       <XAxis dataKey="name" />
 //                       <YAxis />
 //                       <Tooltip />

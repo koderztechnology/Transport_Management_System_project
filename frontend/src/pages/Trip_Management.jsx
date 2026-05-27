@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import {
   Bar,
   BarChart,
@@ -32,44 +33,49 @@ const TripManagement = () => {
   // ---------------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------------
-  const [trips, setTrips] = useState([
-    {
-      id: 1,
-      vehicleId: "KA-01-HH-1234",
-      driverName: "Ramesh Kumar",
-      startLocation: "Bangalore",
-      endLocation: "Mumbai",
-      startTime: "2023-10-01T06:00",
-      endTime: "2023-10-02T18:00",
-      status: "Completed",
-      distance: 980,
-      fuelConsumed: 150,
-    },
-    {
-      id: 2,
-      vehicleId: "KA-02-JK-5678",
-      driverName: "Suresh Singh",
-      startLocation: "Chennai",
-      endLocation: "Pune",
-      startTime: "2023-10-03T08:00",
-      endTime: null,
-      status: "In Progress",
-      distance: 450,
-      fuelConsumed: 70,
-    },
-    {
-      id: 3,
-      vehicleId: "KA-03-LM-9012",
-      driverName: "Mahesh Babu",
-      startLocation: "Hyderabad",
-      endLocation: "Delhi",
-      startTime: "2023-10-05T05:00",
-      endTime: null,
-      status: "Scheduled",
-      distance: 0,
-      fuelConsumed: 0,
-    },
-  ]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [trips, setTrips] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+
+  useEffect(() => {
+    fetchTrips();
+    fetchRelatedData();
+  }, []);
+
+  const fetchRelatedData = async () => {
+    try {
+      const [vRes, dRes] = await Promise.all([
+        axios.get("http://127.0.0.1:8000/api/vehicles/"),
+        axios.get("http://127.0.0.1:8000/api/drivers/")
+      ]);
+      setVehicles(vRes.data);
+      setDrivers(dRes.data);
+    } catch (error) {
+      console.error("Error fetching vehicles/drivers:", error);
+    }
+  };
+
+  const fetchTrips = async () => {
+    try {
+      const res = await axios.get("http://127.0.0.1:8000/api/trips/");
+      const mappedTrips = res.data.map(t => ({
+        id: t.trip_id,
+        vehicleId: t.vehicle || "",
+        driverName: t.driver || "",
+        startLocation: t.start_location || "",
+        endLocation: t.end_location || "",
+        startTime: t.start_time ? t.start_time.slice(0,16) : "",
+        endTime: t.end_time ? t.end_time.slice(0,16) : "",
+        status: t.status || "Scheduled",
+        distance: t.distance || 0,
+        fuelConsumed: t.fuel_consumed || 0,
+      }));
+      setTrips(mappedTrips);
+    } catch (err) {
+      console.error("Error fetching trips:", err);
+    }
+  };
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -85,10 +91,10 @@ const TripManagement = () => {
   const filteredTrips = useMemo(() => {
     return trips.filter((trip) => {
       const matchesSearch =
-        trip.vehicleId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trip.driverName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trip.startLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trip.endLocation.toLowerCase().includes(searchTerm.toLowerCase());
+        String(trip.vehicleId).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(trip.driverName).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(trip.startLocation).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(trip.endLocation).toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus =
         statusFilter === "All" || trip.status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -138,22 +144,54 @@ const TripManagement = () => {
     setIsDrawerOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this trip?")) {
-      setTrips(trips.filter((t) => t.id !== id));
+      try {
+        await axios.delete(`http://127.0.0.1:8000/api/trips/${id}/`);
+        fetchTrips();
+      } catch (err) {
+        console.error("Delete Error", err);
+      }
     }
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    if (isEditMode) {
-      setTrips(
-        trips.map((t) => (t.id === currentTrip.id ? { ...currentTrip } : t))
-      );
-    } else {
-      setTrips([...trips, { ...currentTrip, id: Date.now() }]);
+    const payload = {
+      vehicle: currentTrip.vehicleId || null,
+      driver: currentTrip.driverName || null,
+      start_location: currentTrip.startLocation,
+      end_location: currentTrip.endLocation,
+      start_time: currentTrip.startTime || null,
+      end_time: currentTrip.endTime || null,
+      status: currentTrip.status,
+      distance: currentTrip.distance || 0,
+      fuel_consumed: currentTrip.fuelConsumed || 0,
+    };
+
+    try {
+      const formattedPayload = {
+        ...payload,
+        start_time: currentTrip.startTime ? currentTrip.startTime : null,
+        end_time: currentTrip.endTime ? currentTrip.endTime : null,
+      };
+
+      if (isEditMode) {
+        await axios.put(`http://127.0.0.1:8000/api/trips/${currentTrip.id}/`, formattedPayload);
+      } else {
+        await axios.post("http://127.0.0.1:8000/api/trips/", formattedPayload);
+      }
+      fetchTrips();
+      setIsDrawerOpen(false);
+      alert('Trip created successfully!');
+    } catch (err) {
+      console.error("Save Error", err);
+      if (err.response) {
+        alert("Backend Validation Error: " + JSON.stringify(err.response.data));
+      } else {
+        alert("Network Error: " + err.message + "\nAre you sure the backend server is running?");
+      }
     }
-    setIsDrawerOpen(false);
   };
 
   const handleLocationSearch = async (query, field) => {
@@ -199,7 +237,7 @@ const TripManagement = () => {
       "data:text/csv;charset=utf-8," +
       [
         headers.join(","),
-        ...trips.map((t) =>
+        ...trips.slice(0, 100).map((t) =>
           [
             t.id,
             t.vehicleId,
@@ -284,7 +322,7 @@ const TripManagement = () => {
         </div>
         <div className="flex gap-3">
           <label className="btn btn-outline gap-2 cursor-pointer bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg flex items-center transition-colors">
-            <span className="material-symbols-outlined text-[20px]">
+            <span className="material-symbols-outlined text-xl">
               upload_file
             </span>
             Import CSV
@@ -299,7 +337,7 @@ const TripManagement = () => {
             onClick={handleExportCSV}
             className="btn btn-outline gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg flex items-center transition-colors"
           >
-            <span className="material-symbols-outlined text-[20px]">
+            <span className="material-symbols-outlined text-xl">
               download
             </span>
             Export CSV
@@ -308,7 +346,7 @@ const TripManagement = () => {
             onClick={handleAddNew}
             className="btn btn-primary gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors shadow-sm"
           >
-            <span className="material-symbols-outlined text-[20px]">add</span>
+            <span className="material-symbols-outlined text-xl">add</span>
             New Trip
           </button>
         </div>
@@ -349,7 +387,7 @@ const TripManagement = () => {
           {/* Filters */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
                 search
               </span>
               <input
@@ -377,7 +415,7 @@ const TripManagement = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-sm uppercase tracking-wider">
+                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-sm uppercase">
                     <th className="p-4 font-medium">Vehicle / Driver</th>
                     <th className="p-4 font-medium">Route</th>
                     <th className="p-4 font-medium">Timing</th>
@@ -387,7 +425,7 @@ const TripManagement = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredTrips.length > 0 ? (
-                    filteredTrips.map((trip) => (
+                    filteredTrips.slice((currentPage - 1) * 10, currentPage * 10).map((trip) => (
                       <tr
                         key={trip.id}
                         className="hover:bg-slate-50/50 transition-colors"
@@ -451,7 +489,7 @@ const TripManagement = () => {
                               className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                               title="Edit"
                             >
-                              <span className="material-symbols-outlined text-[20px]">
+                              <span className="material-symbols-outlined text-xl">
                                 edit
                               </span>
                             </button>
@@ -460,7 +498,7 @@ const TripManagement = () => {
                               className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               title="Delete"
                             >
-                              <span className="material-symbols-outlined text-[20px]">
+                              <span className="material-symbols-outlined text-xl">
                                 delete
                               </span>
                             </button>
@@ -481,6 +519,31 @@ const TripManagement = () => {
                 </tbody>
               </table>
             </div>
+            {/* Pagination Footer */}
+            <div className="flex justify-between items-center mt-4 p-4 border-t border-slate-200">
+              <span className="text-sm text-slate-500">
+                Showing {Math.min(filteredTrips.length, (currentPage - 1) * 10 + 1)} to {Math.min(filteredTrips.length, currentPage * 10)} of {filteredTrips.length} trips
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg">
+                  {currentPage}
+                </button>
+                <button 
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage * 10 >= filteredTrips.length}
+                  className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -490,7 +553,7 @@ const TripManagement = () => {
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
             <h3 className="font-semibold text-slate-900 mb-6">Trip Status</h3>
             <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis
@@ -576,12 +639,11 @@ const TripManagement = () => {
             <form onSubmit={handleSave} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Vehicle ID
+                  Vehicle
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
                   value={currentTrip.vehicleId}
                   onChange={(e) =>
                     setCurrentTrip({
@@ -589,17 +651,23 @@ const TripManagement = () => {
                       vehicleId: e.target.value,
                     })
                   }
-                />
+                >
+                  <option value="">Select a Vehicle</option>
+                  {vehicles.slice(0, 100).map(v => (
+                    <option key={v.vehicle_id} value={v.vehicle_id}>
+                      {v.vehicle_number || `Vehicle ${v.vehicle_id}`}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Driver Name
+                  Driver
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
                   value={currentTrip.driverName}
                   onChange={(e) =>
                     setCurrentTrip({
@@ -607,7 +675,14 @@ const TripManagement = () => {
                       driverName: e.target.value,
                     })
                   }
-                />
+                >
+                  <option value="">Select a Driver</option>
+                  {drivers.slice(0, 100).map(d => (
+                    <option key={d.driver_id} value={d.driver_id}>
+                      {d.name || `Driver ${d.driver_id}`}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Start Location */}
@@ -673,8 +748,7 @@ const TripManagement = () => {
                     Start Time
                   </label>
                   <input
-                    type="datetime-local"
-                    required
+                    type="date"
                     className="w-full px-4 py-2 rounded-lg border"
                     value={currentTrip.startTime}
                     onChange={(e) =>
@@ -691,7 +765,7 @@ const TripManagement = () => {
                     End Time
                   </label>
                   <input
-                    type="datetime-local"
+                    type="date"
                     className="w-full px-4 py-2 rounded-lg border"
                     value={currentTrip.endTime || ""}
                     onChange={(e) =>

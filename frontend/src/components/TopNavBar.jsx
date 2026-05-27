@@ -1,4 +1,13 @@
+import { useNavigate } from 'react-router-dom';
+
 const TopNavBar = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('admin_username');
+    navigate('/login');
+  };
+
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between whitespace-nowrap border-b border-slate-200 px-6 lg:px-10 py-3 bg-white/95 backdrop-blur-sm shadow-sm">
       <div className="flex items-center gap-8">
@@ -18,6 +27,10 @@ const TopNavBar = () => {
       <div className="flex flex-1 justify-end items-center gap-4">
         <button className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-10 w-10 bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
           <span className="material-symbols-outlined text-[20px]">notifications</span>
+        </button>
+        <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 hover:bg-red-50 hover:text-red-600 transition-colors group cursor-pointer border border-transparent hover:border-red-100">
+          <span className="material-symbols-outlined text-[20px] group-hover:text-red-500">logout</span>
+          <span className="text-sm font-medium">Logout</span>
         </button>
         <div
           className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10"

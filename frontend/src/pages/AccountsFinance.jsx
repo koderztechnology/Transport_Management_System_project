@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const AccountsFinance = () => {
   // ========================================
@@ -6,62 +7,52 @@ const AccountsFinance = () => {
   // ========================================
 
   // Main transactions data array
-  const [transactions, setTransactions] = useState([
-    {
-      id: 'TXN-1025',
-      date: '2025-11-12',
-      type: 'Income',
-      description: 'Trip payment - ABC Logistics',
-      amount: 45000,
-      status: 'Completed',
-      category: 'Trip Payments',
-    },
-    {
-      id: 'TXN-1024',
-      date: '2025-11-12',
-      type: 'Expense',
-      description: 'Fuel - HP Petrol Pump',
-      amount: 12500,
-      status: 'Completed',
-      category: 'Fuel',
-    },
-    {
-      id: 'TXN-1023',
-      date: '2025-11-11',
-      type: 'Income',
-      description: 'Trip payment - XYZ Corp',
-      amount: 58000,
-      status: 'Pending',
-      category: 'Trip Payments',
-    },
-    {
-      id: 'TXN-1022',
-      date: '2025-11-11',
-      type: 'Expense',
-      description: 'Toll charges - Mumbai-Pune',
-      amount: 3500,
-      status: 'Completed',
-      category: 'Toll',
-    },
-    {
-      id: 'TXN-1021',
-      date: '2025-11-10',
-      type: 'Expense',
-      description: 'Vehicle maintenance - V-012',
-      amount: 18200,
-      status: 'Completed',
-      category: 'Maintenance',
-    },
-    {
-      id: 'TXN-1020',
-      date: '2025-11-10',
-      type: 'Income',
-      description: 'Trip payment - DEF Traders',
-      amount: 42000,
-      status: 'Failed',
-      category: 'Trip Payments',
-    },
-  ]);
+  const [transactions, setTransactions] = useState([]);
+
+  const [vehicles, setVehicles] = useState([]);
+  const [trips, setTrips] = useState([]);
+  const [vendors, setVendors] = useState([]);
+
+  useEffect(() => {
+    fetchTransactions();
+    fetchRelatedData();
+  }, []);
+
+  const fetchRelatedData = async () => {
+    try {
+      const [vRes, tRes, venRes] = await Promise.all([
+        axios.get('http://127.0.0.1:8000/api/vehicles/'),
+        axios.get('http://127.0.0.1:8000/api/trips/'),
+        axios.get('http://127.0.0.1:8000/api/vendors/')
+      ]);
+      setVehicles(vRes.data);
+      setTrips(tRes.data);
+      setVendors(venRes.data);
+    } catch (error) {
+      console.error("Error fetching related data", error);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      const res = await axios.get('http://127.0.0.1:8000/api/finance-transactions/');
+      const mapped = res.data.map(t => ({
+        id: t.transaction_id,
+        date: t.date || '',
+        type: t.type || 'Income',
+        description: t.description || '',
+        amount: parseFloat(t.amount) || 0,
+        status: t.status || 'Completed',
+        category: t.category || '',
+        vehicle: t.vehicle || '',
+        trip: t.trip || '',
+        vendor: t.vendor || '',
+      }));
+      setTransactions(mapped);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,6 +68,9 @@ const AccountsFinance = () => {
     amount: '',
     status: 'Completed',
     category: '',
+    vehicle: '',
+    trip: '',
+    vendor: '',
   });
 
   // Form validation errors
@@ -128,8 +122,8 @@ const AccountsFinance = () => {
   // Filter transactions
   const filteredTransactions = transactions.filter(txn => {
     const matchesSearch = searchQuery === '' || 
-      txn.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      txn.id.toLowerCase().includes(searchQuery.toLowerCase());
+      String(txn.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(txn.id || "").toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesType = filterType === 'All' || txn.type === filterType;
     const matchesStatus = filterStatus === 'All' || txn.status === filterStatus;
@@ -191,6 +185,9 @@ const AccountsFinance = () => {
       amount: '',
       status: 'Completed',
       category: 'Trip Payments',
+      vehicle: '',
+      trip: '',
+      vendor: '',
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -208,6 +205,9 @@ const AccountsFinance = () => {
       amount: '',
       status: 'Completed',
       category: 'Fuel',
+      vehicle: '',
+      trip: '',
+      vendor: '',
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -215,7 +215,7 @@ const AccountsFinance = () => {
 
   // Open modal for editing transaction
   const handleEditTransaction = (txn) => {
-    setModalType(txn.type.toLowerCase());
+    setModalType(String(txn.type || "").toLowerCase());
     setIsEditMode(true);
     setEditingTransactionId(txn.id);
     setFormData({
@@ -225,6 +225,9 @@ const AccountsFinance = () => {
       amount: txn.amount.toString(),
       status: txn.status,
       category: txn.category,
+      vehicle: txn.vehicle || '',
+      trip: txn.trip || '',
+      vendor: txn.vendor || '',
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -243,6 +246,9 @@ const AccountsFinance = () => {
       amount: '',
       status: 'Completed',
       category: '',
+      vehicle: '',
+      trip: '',
+      vendor: '',
     });
     setFormErrors({});
   };
@@ -288,52 +294,58 @@ const AccountsFinance = () => {
   };
 
   // Submit form
-  const handleSubmitForm = (e) => {
+  const handleSubmitForm = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
       return;
     }
 
-    const transactionData = {
+    const payload = {
       date: formData.date,
       type: formData.type,
       description: formData.description.trim(),
       amount: parseFloat(formData.amount),
       status: formData.status,
       category: formData.category,
+      vehicle: formData.vehicle || null,
+      trip: formData.trip || null,
+      vendor: formData.vendor || null,
     };
 
-    if (isEditMode) {
-      // UPDATE existing transaction
-      setTransactions(prev => prev.map(txn =>
-        txn.id === editingTransactionId
-          ? { ...txn, ...transactionData }
-          : txn
-      ));
-    } else {
-      // ADD new transaction
-      const newTransaction = {
-        id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
-        ...transactionData
-      };
-      setTransactions(prev => [newTransaction, ...prev]);
+    try {
+      if (isEditMode) {
+        // UPDATE existing transaction
+        await axios.put(`http://127.0.0.1:8000/api/finance-transactions/${editingTransactionId}/`, payload);
+      } else {
+        // ADD new transaction
+        await axios.post('http://127.0.0.1:8000/api/finance-transactions/', payload);
+      }
+      fetchTransactions();
+      handleCloseModal();
+    } catch (err) {
+      console.error('Error saving transaction', err);
+      alert('Failed to save transaction');
     }
-
-    handleCloseModal();
   };
 
   // ========================================
   // DELETE FUNCTIONALITY
   // ========================================
 
-  const handleDeleteTransaction = (txn) => {
+  const handleDeleteTransaction = async (txn) => {
     const confirmed = window.confirm(
       `Are you sure you want to delete this transaction?\n\n${txn.description}\nAmount: ${formatCurrency(txn.amount)}\n\nThis action cannot be undone.`
     );
 
     if (confirmed) {
-      setTransactions(prev => prev.filter(t => t.id !== txn.id));
+      try {
+        await axios.delete(`http://127.0.0.1:8000/api/finance-transactions/${txn.id}/`);
+        fetchTransactions();
+      } catch (err) {
+        console.error('Error deleting transaction', err);
+        alert('Failed to delete transaction');
+      }
     }
   };
 
@@ -525,7 +537,7 @@ const AccountsFinance = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredTransactions.map((txn) => (
+                  filteredTransactions.slice((currentPage - 1) * 10, currentPage * 10).map((txn) => (
                     <tr
                       key={txn.id}
                       className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
@@ -597,11 +609,9 @@ const AccountsFinance = () => {
               <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg">
                 {currentPage}
               </button>
-              <button className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                2
-              </button>
               <button 
                 onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage * 10 >= filteredTransactions.length}
                 className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 Next
@@ -848,6 +858,54 @@ const AccountsFinance = () => {
                 {formErrors.category && (
                   <p className="mt-1 text-sm text-red-500">{formErrors.category}</p>
                 )}
+              </div>
+
+              {/* Related Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Vehicle (Optional)</label>
+                  <select
+                    name="vehicle"
+                    value={formData.vehicle}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="">Select Vehicle</option>
+                    {vehicles.slice(0, 100).map(v => (
+                      <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Trip (Optional)</label>
+                  <select
+                    name="trip"
+                    value={formData.trip}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="">Select Trip</option>
+                    {trips.slice(0, 100).map(t => (
+                      <option key={t.trip_id} value={t.trip_id}>
+                        {t.start_location} to {t.end_location} (ID: {t.trip_id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Vendor (Optional)</label>
+                  <select
+                    name="vendor"
+                    value={formData.vendor}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="">Select Vendor</option>
+                    {vendors.slice(0, 100).map(ven => (
+                      <option key={ven.vendor_id} value={ven.vendor_id}>{ven.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Amount and Status - Side by Side */}

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Plus,
   FileText,
@@ -17,45 +18,59 @@ const generateLRNumber = () => {
   return `LR${new Date().getFullYear()}${t}`;
 };
 
-const generateDummyLR = (count = 25) => {
-  const routes = [
-    "Mumbai → Delhi",
-    "Ahmedabad → Bangalore",
-    "Chennai → Hyderabad",
-    "Delhi → Kolkata",
-    "Pune → Nagpur",
-    "Surat → Surat",
-  ];
-  const vehicles = [
-    "MH-12-AB-1234",
-    "GJ-05-EF-9012",
-    "DL-08-IJ-7890",
-    "MH-01-CD-5678",
-  ];
-  const freights = ["₹48,000", "₹85,000", "₹92,000", "₹95,000", "₹72,500"];
-  return Array.from({ length: count }, (_, i) => ({
-    id: Date.now() + i,
-    lrNumber: `LR2025${String(i + 1).padStart(4, "0")}`,
-    date: new Date(Date.now() - i * 86400000).toISOString().slice(0, 10),
-    consignor: `Consignor ${i + 1}`,
-    consignee: `Consignee ${i + 1}`,
-    route: routes[i % routes.length],
-    vehicle: vehicles[i % vehicles.length],
-    driver: `Driver ${i + 1}`,
-    material: `Material ${i + 1}`,
-    weight: `${(i + 1) * 100} kg`,
-    freight: freights[i % freights.length],
-    eway: `EWAY${1000 + i}`,
-    status: i % 3 === 0 ? "pending" : i % 3 === 1 ? "in-transit" : "billed",
-  }));
-};
-
 /* -------------------- Component -------------------- */
 export default function LRManagement() {
   // data + pagination
-  const [lrData, setLRData] = useState(generateDummyLR(25));
+  const [lrData, setLRData] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [ewayBills, setEwayBills] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
+
+  useEffect(() => {
+    fetchLRs();
+    fetchRelatedData();
+  }, []);
+
+  const fetchRelatedData = async () => {
+    try {
+      const [vRes, dRes, eRes] = await Promise.all([
+        axios.get("http://127.0.0.1:8000/api/vehicles/"),
+        axios.get("http://127.0.0.1:8000/api/drivers/"),
+        axios.get("http://127.0.0.1:8000/api/eway-bills/")
+      ]);
+      setVehicles(vRes.data || []);
+      setDrivers(dRes.data || []);
+      setEwayBills(eRes.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchLRs = async () => {
+    try {
+      const res = await axios.get("http://127.0.0.1:8000/api/lr-bilty/");
+      const mapped = res.data.map(item => ({
+        id: item.lr_id,
+        lrNumber: item.lr_number || "",
+        date: item.date || "",
+        consignor: item.consignor || "",
+        consignee: item.consignee || "",
+        route: item.route || "",
+        vehicle: item.vehicle || "",
+        driver: item.driver || "",
+        material: item.material || "",
+        weight: item.weight || "",
+        freight: item.freight || "",
+        eway: item.eway || "",
+        status: item.status ? String(item.status).toLowerCase() : "pending"
+      }));
+      setLRData(mapped);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // modals & selected
   const [showCreate, setShowCreate] = useState(false);
@@ -81,10 +96,29 @@ export default function LRManagement() {
   };
 
   /* -------------------- CRUD Actions -------------------- */
-  const handleCreateLR = (newBill) => {
-    setLRData((prev) => [newBill, ...prev]);
-    setShowCreate(false);
-    setCurrentPage(1); // show newest on page 1
+  const handleCreateLR = async (newBill) => {
+    try {
+      const payload = {
+        lr_number: newBill.lrNumber,
+        date: newBill.date,
+        consignor: newBill.consignor,
+        consignee: newBill.consignee,
+        route: newBill.route,
+        vehicle: newBill.vehicle || null,
+        driver: newBill.driver || null,
+        material: newBill.material,
+        weight: newBill.weight,
+        freight: newBill.freight,
+        eway: newBill.eway || null,
+        status: newBill.status === "in-transit" ? "In-Transit" : newBill.status.charAt(0).toUpperCase() + newBill.status.slice(1)
+      };
+      await axios.post("http://127.0.0.1:8000/api/lr-bilty/", payload);
+      fetchLRs();
+      setShowCreate(false);
+      setCurrentPage(1);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleView = (lr) => {
@@ -99,39 +133,59 @@ export default function LRManagement() {
     setMenuOpenFor(null);
   };
 
-  const handleSaveEdit = (updated) => {
-    setLRData((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
-    setShowEdit(false);
-    setSelectedLR(null);
+  const handleSaveEdit = async (updated) => {
+    try {
+      const payload = {
+        lr_number: updated.lrNumber,
+        date: updated.date,
+        consignor: updated.consignor,
+        consignee: updated.consignee,
+        route: updated.route,
+        vehicle: updated.vehicle || null,
+        driver: updated.driver || null,
+        material: updated.material,
+        weight: updated.weight,
+        freight: updated.freight,
+        eway: updated.eway || null,
+        status: updated.status === "in-transit" ? "In-Transit" : updated.status.charAt(0).toUpperCase() + updated.status.slice(1)
+      };
+      await axios.put(`http://127.0.0.1:8000/api/lr-bilty/${updated.id}/`, payload);
+      fetchLRs();
+      setShowEdit(false);
+      setSelectedLR(null);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleDeleteConfirmed = () => {
+  const handleDeleteConfirmed = async () => {
     if (!selectedLR) return;
-    setLRData((prev) => prev.filter((l) => l.id !== selectedLR.id));
-    setShowDelete(false);
-    setSelectedLR(null);
-    // adjust page if needed (e.g., after deleting last item on last page)
-    const newTotalPages = Math.max(
-      1,
-      Math.ceil((lrData.length - 1) / rowsPerPage)
-    );
-    if (currentPage > newTotalPages) setCurrentPage(newTotalPages);
+    try {
+      await axios.delete(`http://127.0.0.1:8000/api/lr-bilty/${selectedLR.id}/`);
+      fetchLRs();
+      setShowDelete(false);
+      setSelectedLR(null);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const cycleStatus = (id) => {
-    setLRData((prev) =>
-      prev.map((l) => {
-        if (l.id !== id) return l;
-        const next =
-          l.status === "pending"
-            ? "in-transit"
-            : l.status === "in-transit"
-            ? "billed"
-            : "pending";
-        return { ...l, status: next };
-      })
-    );
-    setMenuOpenFor(null);
+  const cycleStatus = async (id) => {
+    const lr = lrData.find(l => l.id === id);
+    if(!lr) return;
+    
+    let nextStatus = "Pending";
+    if (lr.status === "pending") nextStatus = "In-Transit";
+    else if (lr.status === "in-transit") nextStatus = "Billed";
+    else nextStatus = "Pending";
+
+    try {
+      await axios.patch(`http://127.0.0.1:8000/api/lr-bilty/${id}/`, { status: nextStatus });
+      fetchLRs();
+      setMenuOpenFor(null);
+    } catch(err) {
+      console.error(err);
+    }
   };
 
   /* -------------------- UI: Create Modal Form State -------------------- */
@@ -264,7 +318,9 @@ export default function LRManagement() {
                   </td>
                   <td className="py-4 px-6 text-sm text-slate-600">{row.date}</td>
                   <td className="py-4 px-6 text-sm text-slate-600">{row.route}</td>
-                  <td className="py-4 px-6 text-sm text-slate-600">{row.vehicle}</td>
+                  <td className="py-4 px-6 text-sm text-slate-600">
+                    {vehicles.find(v => String(v.vehicle_id) === String(row.vehicle))?.vehicle_number || row.vehicle}
+                  </td>
                   <td className="py-4 px-6 text-sm font-medium text-slate-900">{row.freight}</td>
                   <td className="py-4 px-6">
                     <span
@@ -384,12 +440,30 @@ export default function LRManagement() {
               <InputGroup label="Consignor" name="consignor" value={form.consignor} onChange={handleFormChange} placeholder="Sender name" />
               <InputGroup label="Consignee" name="consignee" value={form.consignee} onChange={handleFormChange} placeholder="Receiver name" />
               <InputGroup label="Route" name="route" value={form.route} onChange={handleFormChange} placeholder="Origin → Destination" />
-              <InputGroup label="Vehicle" name="vehicle" value={form.vehicle} onChange={handleFormChange} placeholder="Vehicle Number" />
-              <InputGroup label="Driver" name="driver" value={form.driver} onChange={handleFormChange} placeholder="Driver Name" />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle</label>
+                <select name="vehicle" value={form.vehicle} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                  <option value="">Select Vehicle</option>
+                  {vehicles.slice(0, 100).map(v => <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Driver</label>
+                <select name="driver" value={form.driver} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                  <option value="">Select Driver</option>
+                  {drivers.slice(0, 100).map(d => <option key={d.driver_id} value={d.driver_id}>{d.name || `Driver ${d.driver_id}`}</option>)}
+                </select>
+              </div>
               <InputGroup label="Material" name="material" value={form.material} onChange={handleFormChange} placeholder="Material Description" />
               <InputGroup label="Weight" name="weight" value={form.weight} onChange={handleFormChange} placeholder="e.g. 1200 kg" />
               <InputGroup label="Freight" name="freight" value={form.freight} onChange={handleFormChange} placeholder="Amount (₹)" />
-              <InputGroup label="Eway Bill" name="eway" value={form.eway} onChange={handleFormChange} placeholder="Eway Number" />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Eway Bill</label>
+                <select name="eway" value={form.eway} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                  <option value="">Select EWay Bill</option>
+                  {ewayBills.map(e => <option key={e.eway_id} value={e.eway_id}>{e.eway_number || `EWay ${e.eway_id}`}</option>)}
+                </select>
+              </div>
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
@@ -445,12 +519,12 @@ export default function LRManagement() {
               <DetailItem label="Consignor" value={selectedLR.consignor} />
               <DetailItem label="Consignee" value={selectedLR.consignee} />
               <DetailItem label="Route" value={selectedLR.route} />
-              <DetailItem label="Vehicle" value={selectedLR.vehicle} />
-              <DetailItem label="Driver" value={selectedLR.driver} />
+              <DetailItem label="Vehicle" value={vehicles.find(v => String(v.vehicle_id) === String(selectedLR.vehicle))?.vehicle_number || selectedLR.vehicle} />
+              <DetailItem label="Driver" value={drivers.find(d => String(d.driver_id) === String(selectedLR.driver))?.name || selectedLR.driver} />
               <DetailItem label="Material" value={selectedLR.material} />
               <DetailItem label="Weight" value={selectedLR.weight} />
               <DetailItem label="Freight" value={selectedLR.freight} />
-              <DetailItem label="Eway Bill" value={selectedLR.eway} />
+              <DetailItem label="Eway Bill" value={ewayBills.find(e => String(e.eway_id) === String(selectedLR.eway))?.eway_number || selectedLR.eway} />
               
               <div>
                 <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</div>
@@ -480,6 +554,9 @@ export default function LRManagement() {
       {showEdit && selectedLR && (
         <EditModal
           lr={selectedLR}
+          vehicles={vehicles}
+          drivers={drivers}
+          ewayBills={ewayBills}
           onClose={() => {
             setShowEdit(false);
             setSelectedLR(null);
@@ -541,7 +618,7 @@ const DetailItem = ({ label, value }) => (
 );
 
 /* ----------------- EditModal Component ----------------- */
-function EditModal({ lr, onClose, onSave }) {
+function EditModal({ lr, vehicles, drivers, ewayBills, onClose, onSave }) {
   const [editForm, setEditForm] = useState({ ...lr });
 
   const handleChange = (e) => {
@@ -571,9 +648,28 @@ function EditModal({ lr, onClose, onSave }) {
           <InputGroup label="LR Number" name="lrNumber" value={editForm.lrNumber} onChange={handleChange} />
           <InputGroup label="Date" type="date" name="date" value={editForm.date} onChange={handleChange} />
           <InputGroup label="Route" name="route" value={editForm.route} onChange={handleChange} />
-          <InputGroup label="Vehicle" name="vehicle" value={editForm.vehicle} onChange={handleChange} />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle</label>
+            <select name="vehicle" value={editForm.vehicle} onChange={handleChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+              <option value="">Select Vehicle</option>
+              {vehicles.slice(0, 100).map(v => <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>)}
+            </select>
+          </div>
           <InputGroup label="Freight" name="freight" value={editForm.freight} onChange={handleChange} />
-          <InputGroup label="Driver" name="driver" value={editForm.driver} onChange={handleChange} />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Driver</label>
+            <select name="driver" value={editForm.driver} onChange={handleChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+              <option value="">Select Driver</option>
+              {drivers.slice(0, 100).map(d => <option key={d.driver_id} value={d.driver_id}>{d.name || `Driver ${d.driver_id}`}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Eway Bill</label>
+            <select name="eway" value={editForm.eway || ""} onChange={handleChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+              <option value="">Select EWay Bill</option>
+              {ewayBills.map(e => <option key={e.eway_id} value={e.eway_id}>{e.eway_number || `EWay ${e.eway_id}`}</option>)}
+            </select>
+          </div>
           
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>

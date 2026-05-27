@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const EWayBillManagement = () => {
   // ============================================================
@@ -9,6 +10,7 @@ const EWayBillManagement = () => {
   const [selectedBill, setSelectedBill] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Form data for generating new e-way bill
   const [formData, setFormData] = useState({
@@ -34,133 +36,72 @@ const EWayBillManagement = () => {
   // ============================================================
   // SAMPLE E-WAY BILLS DATA
   // ============================================================
-  const [ewayBills, setEwayBills] = useState([
-    {
-      id: 'EWB-001',
-      ewaybillNumber: '12345678901234',
-      qrCode: 'QR-001',
-      invoiceNumber: 'INV-2025-001',
-      lrNumber: 'LR-2025-001',
-      supplier: 'ABC Electricals',
-      supplierGSTIN: '27AABCU9603R1Z5',
-      buyer: 'KSR Traders',
-      buyerGSTIN: '36ABCDK1234H1Z0',
-      goods: 'Electrical Wire',
-      hsn: '7408',
-      amount: '₹4,25,000',
-      vehicle: 'MH12AB3456',
-      route: 'Nagpur → Hyderabad',
-      driver: 'Rahul Kumar',
-      driverPhone: '9876543210',
-      issueDate: '2025-01-18',
-      expiryDate: '2025-02-18',
-      validDays: 30,
-      daysLeft: 22,
-      status: 'Active',
-      statusColor: 'bg-green-100 text-green-800',
-      createdAt: '2025-01-18 10:30 AM',
-    },
-    {
-      id: 'EWB-002',
-      ewaybillNumber: '12345678901235',
-      qrCode: 'QR-002',
-      invoiceNumber: 'INV-2025-002',
-      lrNumber: 'LR-2025-002',
-      supplier: 'XYZ Manufacturing',
-      supplierGSTIN: '29AABCU9603R1Z5',
-      buyer: 'Metro Logistics',
-      buyerGSTIN: '28ABCDK1234H1Z0',
-      goods: 'Steel Rods',
-      hsn: '7214',
-      amount: '₹8,50,000',
-      vehicle: 'GJ01CD7890',
-      route: 'Ahmedabad → Bangalore',
-      driver: 'Amit Sharma',
-      driverPhone: '9876543211',
-      issueDate: '2025-01-17',
-      expiryDate: '2025-02-16',
-      validDays: 30,
-      daysLeft: 23,
-      status: 'Active',
-      statusColor: 'bg-green-100 text-green-800',
-      createdAt: '2025-01-17 02:15 PM',
-    },
-    {
-      id: 'EWB-003',
-      ewaybillNumber: '12345678901236',
-      qrCode: 'QR-003',
-      invoiceNumber: 'INV-2025-003',
-      lrNumber: 'LR-2025-003',
-      supplier: 'Premier Motors',
-      supplierGSTIN: '23AABCU9603R1Z5',
-      buyer: 'Fast Express',
-      buyerGSTIN: '19ABCDK1234H1Z0',
-      goods: 'Car Parts',
-      hsn: '8708',
-      amount: '₹3,50,000',
-      vehicle: 'DL08EF1234',
-      route: 'Delhi → Mumbai',
-      driver: 'Vikram Singh',
-      driverPhone: '9876543212',
-      issueDate: '2025-01-10',
-      expiryDate: '2025-02-09',
-      validDays: 30,
-      daysLeft: 8,
-      status: 'Expiring Soon',
-      statusColor: 'bg-yellow-100 text-yellow-800',
-      createdAt: '2025-01-10 09:45 AM',
-    },
-    {
-      id: 'EWB-004',
-      ewaybillNumber: '12345678901237',
-      qrCode: 'QR-004',
-      invoiceNumber: 'INV-2025-004',
-      lrNumber: 'LR-2025-004',
-      supplier: 'Global Traders',
-      supplierGSTIN: '09AABCU9603R1Z5',
-      buyer: 'Local Shop',
-      buyerGSTIN: '12ABCDK1234H1Z0',
-      goods: 'Fabric Rolls',
-      hsn: '5208',
-      amount: '₹2,75,000',
-      vehicle: 'MH14GH5678',
-      route: 'Pune → Kolkata',
-      driver: 'Suresh Patil',
-      driverPhone: '9876543213',
-      issueDate: '2025-01-05',
-      expiryDate: '2025-02-04',
-      validDays: 30,
-      daysLeft: 3,
-      status: 'Critical',
-      statusColor: 'bg-red-100 text-red-800',
-      createdAt: '2025-01-05 11:20 AM',
-    },
-    {
-      id: 'EWB-005',
-      ewaybillNumber: '12345678901238',
-      qrCode: 'QR-005',
-      invoiceNumber: 'INV-2025-005',
-      lrNumber: 'LR-2025-005',
-      supplier: 'Tech Solutions',
-      supplierGSTIN: '14AABCU9603R1Z5',
-      buyer: 'IT Services',
-      buyerGSTIN: '18ABCDK1234H1Z0',
-      goods: 'Computer Parts',
-      hsn: '8471',
-      amount: '₹5,60,000',
-      vehicle: 'KA01IJ9012',
-      route: 'Bangalore → Chennai',
-      driver: 'Ravi Kumar',
-      driverPhone: '9876543214',
-      issueDate: '2024-12-25',
-      expiryDate: '2025-01-24',
-      validDays: 30,
-      daysLeft: -5,
-      status: 'Expired',
-      statusColor: 'bg-red-100 text-red-800',
-      createdAt: '2024-12-25 03:00 PM',
-    },
-  ]);
+  const [ewayBills, setEwayBills] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [lrBills, setLrBills] = useState([]);
+
+  useEffect(() => {
+    fetchEWayBills();
+    fetchRelatedData();
+  }, []);
+
+  const fetchRelatedData = async () => {
+    try {
+      const [vRes, dRes, lRes] = await Promise.all([
+        axios.get("http://127.0.0.1:8000/api/vehicles/"),
+        axios.get("http://127.0.0.1:8000/api/drivers/"),
+        axios.get("http://127.0.0.1:8000/api/lr-bilty/")
+      ]);
+      setVehicles(vRes.data || []);
+      setDrivers(dRes.data || []);
+      setLrBills(lRes.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchEWayBills = async () => {
+    try {
+      const res = await axios.get('http://127.0.0.1:8000/api/eway-bills/');
+      const mapped = res.data.map(b => {
+        const issueDate = b.added_date ? b.added_date.split('T')[0] : new Date().toISOString().split('T')[0];
+        const issueTime = new Date(issueDate).getTime();
+        const estDays = b.estimated_days || 30;
+        const expiryTime = issueTime + (estDays * 86400000);
+        const daysLeft = Math.ceil((expiryTime - Date.now()) / 86400000);
+
+        return {
+          id: b.eway_id,
+          ewaybillNumber: `1234567890${String(b.eway_id).padStart(4, '0')}`,
+          qrCode: `QR-${b.eway_id}`,
+          invoiceNumber: b.invoice_number || '',
+          lrNumber: b.lr_number || '',
+          supplier: b.supplier_name || '',
+          supplierGSTIN: b.supplier_gstin || '',
+          buyer: b.buyer_name || '',
+          buyerGSTIN: b.buyer_gstin || '',
+          goods: b.goods_description || '',
+          hsn: b.hsn_code || '',
+          amount: b.invoice_amount ? `₹${b.invoice_amount}` : '₹0',
+          vehicle: b.vehicle_number || '',
+          route: `${b.route_from || ''} → ${b.route_to || ''}`,
+          driver: b.driver_name || '',
+          driverPhone: b.driver_phone || '',
+          issueDate: issueDate,
+          expiryDate: new Date(expiryTime).toISOString().split('T')[0],
+          validDays: estDays,
+          daysLeft: daysLeft,
+          status: b.status || 'Active',
+          statusColor: b.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800',
+          createdAt: b.added_date ? new Date(b.added_date).toLocaleString() : '',
+        };
+      });
+      setEwayBills(mapped);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // ============================================================
   // STATISTICS
@@ -180,7 +121,7 @@ const EWayBillManagement = () => {
     const errors = {};
 
     if (!formData.invoiceNumber.trim()) errors.invoiceNumber = 'Invoice number is required';
-    if (!formData.lrNumber.trim()) errors.lrNumber = 'LR number is required';
+    if (!String(formData.lrNumber).trim()) errors.lrNumber = 'LR number is required';
     if (!formData.supplierName.trim()) errors.supplierName = 'Supplier name is required';
     if (!formData.supplierGSTIN.trim()) errors.supplierGSTIN = 'Supplier GSTIN is required';
     if (!formData.buyerName.trim()) errors.buyerName = 'Buyer name is required';
@@ -188,10 +129,10 @@ const EWayBillManagement = () => {
     if (!formData.goodsDescription.trim()) errors.goodsDescription = 'Goods description is required';
     if (!formData.hsn_code.trim()) errors.hsn_code = 'HSN code is required';
     if (!formData.invoiceAmount.trim()) errors.invoiceAmount = 'Invoice amount is required';
-    if (!formData.vehicleNumber.trim()) errors.vehicleNumber = 'Vehicle number is required';
+    if (!String(formData.vehicleNumber).trim()) errors.vehicleNumber = 'Vehicle number is required';
     if (!formData.routeFrom.trim()) errors.routeFrom = 'Route From is required';
     if (!formData.routeTo.trim()) errors.routeTo = 'Route To is required';
-    if (!formData.driverName.trim()) errors.driverName = 'Driver name is required';
+    if (!String(formData.driverName).trim()) errors.driverName = 'Driver name is required';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -211,64 +152,60 @@ const EWayBillManagement = () => {
     }
   };
 
-  const handleGenerateBill = (e) => {
+  const handleGenerateBill = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) {
       alert('Please fill all required fields correctly');
       return;
     }
 
-    // Create new bill object
-    const newBill = {
-      id: `EWB-${String(ewayBills.length + 1).padStart(3, '0')}`,
-      ewaybillNumber: Math.floor(Math.random() * 10000000000000),
-      qrCode: `QR-${String(ewayBills.length + 1).padStart(3, '0')}`,
-      invoiceNumber: formData.invoiceNumber,
-      lrNumber: formData.lrNumber,
-      supplier: formData.supplierName,
-      supplierGSTIN: formData.supplierGSTIN,
-      buyer: formData.buyerName,
-      buyerGSTIN: formData.buyerGSTIN,
-      goods: formData.goodsDescription,
-      hsn: formData.hsn_code,
-      amount: `₹${parseInt(formData.invoiceAmount).toLocaleString('en-IN')}`,
-      vehicle: formData.vehicleNumber,
-      route: `${formData.routeFrom} → ${formData.routeTo}`,
-      driver: formData.driverName,
-      driverPhone: formData.driverPhone,
-      issueDate: new Date().toISOString().split('T')[0],
-      expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      validDays: 30,
-      daysLeft: 30,
+    const payload = {
+      invoice_number: formData.invoiceNumber,
+      lr_number: formData.lrNumber || null,
+      supplier_name: formData.supplierName,
+      supplier_gstin: formData.supplierGSTIN,
+      buyer_name: formData.buyerName,
+      buyer_gstin: formData.buyerGSTIN,
+      goods_description: formData.goodsDescription,
+      hsn_code: formData.hsn_code,
+      invoice_amount: formData.invoiceAmount,
+      vehicle_number: formData.vehicleNumber || null,
+      route_from: formData.routeFrom,
+      route_to: formData.routeTo,
+      estimated_days: parseInt(formData.estimatedDays) || 30,
+      driver_name: formData.driverName || null,
+      driver_phone: formData.driverPhone,
       status: 'Active',
-      statusColor: 'bg-green-100 text-green-800',
-      createdAt: new Date().toLocaleString(),
     };
 
-    setEwayBills(prev => [newBill, ...prev]);
-    
-    // Reset form and close modal
-    setFormData({
-      invoiceNumber: '',
-      lrNumber: '',
-      supplierName: '',
-      supplierGSTIN: '',
-      buyerName: '',
-      buyerGSTIN: '',
-      goodsDescription: '',
-      hsn_code: '',
-      invoiceAmount: '',
-      vehicleNumber: '',
-      routeFrom: '',
-      routeTo: '',
-      estimatedDays: '',
-      driverName: '',
-      driverPhone: '',
-    });
-    setFormErrors({});
-    setShowGenerateModal(false);
-    alert('E-Way Bill generated successfully!');
+    try {
+      await axios.post('http://127.0.0.1:8000/api/eway-bills/', payload);
+      fetchEWayBills();
+      
+      setFormData({
+        invoiceNumber: '',
+        lrNumber: '',
+        supplierName: '',
+        supplierGSTIN: '',
+        buyerName: '',
+        buyerGSTIN: '',
+        goodsDescription: '',
+        hsn_code: '',
+        invoiceAmount: '',
+        vehicleNumber: '',
+        routeFrom: '',
+        routeTo: '',
+        estimatedDays: '',
+        driverName: '',
+        driverPhone: '',
+      });
+      setFormErrors({});
+      setShowGenerateModal(false);
+      alert('E-Way Bill generated successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Error generating E-Way Bill');
+    }
   };
 
   const handleViewDetails = (bill) => {
@@ -276,33 +213,29 @@ const EWayBillManagement = () => {
     setShowDetailsModal(true);
   };
 
-  const handleCancelBill = (billId) => {
+  const handleCancelBill = async (billId) => {
     if (window.confirm('Are you sure you want to cancel this E-Way Bill? This action cannot be undone.')) {
-      setEwayBills(prev => prev.map(bill => 
-        bill.id === billId 
-          ? { ...bill, status: 'Cancelled', statusColor: 'bg-gray-100 text-gray-800' }
-          : bill
-      ));
-      alert('E-Way Bill cancelled successfully');
+      try {
+        await axios.patch(`http://127.0.0.1:8000/api/eway-bills/${billId}/`, { status: 'Cancelled' });
+        fetchEWayBills();
+        alert('E-Way Bill cancelled successfully');
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
-  const handleExtendBill = (billId) => {
+  const handleExtendBill = async (billId) => {
     const bill = ewayBills.find(b => b.id === billId);
     if (bill && bill.daysLeft < 1) {
       if (window.confirm(`Extend this E-Way Bill for 30 more days?`)) {
-        setEwayBills(prev => prev.map(b => 
-          b.id === billId 
-            ? { 
-              ...b, 
-              daysLeft: 30,
-              expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-              status: 'Active',
-              statusColor: 'bg-green-100 text-green-800'
-            }
-            : b
-        ));
-        alert('E-Way Bill extended successfully');
+        try {
+          await axios.patch(`http://127.0.0.1:8000/api/eway-bills/${billId}/`, { status: 'Active', estimated_days: bill.validDays + 30 });
+          fetchEWayBills();
+          alert('E-Way Bill extended successfully');
+        } catch (err) {
+          console.error(err);
+        }
       }
     }
   };
@@ -320,10 +253,10 @@ const EWayBillManagement = () => {
   // ============================================================
   const filteredBills = ewayBills.filter(bill => {
     const matchesSearch = 
-      bill.ewaybillNumber.toString().includes(searchQuery) ||
-      bill.invoiceNumber.includes(searchQuery) ||
-      bill.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      bill.buyer.toLowerCase().includes(searchQuery.toLowerCase());
+      String(bill.ewaybillNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(bill.invoiceNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(bill.supplier || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(bill.buyer || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = filterStatus === 'all' || bill.status === filterStatus;
 
@@ -439,16 +372,19 @@ const EWayBillManagement = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">LR Number *</label>
-                    <input
-                      type="text"
+                    <select
                       name="lrNumber"
                       value={formData.lrNumber}
                       onChange={handleFormChange}
-                      placeholder="e.g., LR-2025-001"
-                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary ${
+                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
                         formErrors.lrNumber ? 'border-red-500' : 'border-slate-300'
                       }`}
-                    />
+                    >
+                      <option value="">Select LR</option>
+                      {lrBills.map(lr => (
+                        <option key={lr.lr_id} value={lr.lr_id}>{lr.lr_number || `LR ${lr.lr_id}`}</option>
+                      ))}
+                    </select>
                     {formErrors.lrNumber && <p className="text-red-500 text-xs mt-1">{formErrors.lrNumber}</p>}
                   </div>
                 </div>
@@ -582,17 +518,20 @@ const EWayBillManagement = () => {
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Transport Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Vehicle Number *</label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Vehicle *</label>
+                    <select
                       name="vehicleNumber"
                       value={formData.vehicleNumber}
                       onChange={handleFormChange}
-                      placeholder="e.g., MH12AB3456"
-                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary ${
+                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
                         formErrors.vehicleNumber ? 'border-red-500' : 'border-slate-300'
                       }`}
-                    />
+                    >
+                      <option value="">Select Vehicle</option>
+                      {vehicles.slice(0, 100).map(v => (
+                        <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
+                      ))}
+                    </select>
                     {formErrors.vehicleNumber && <p className="text-red-500 text-xs mt-1">{formErrors.vehicleNumber}</p>}
                   </div>
 
@@ -646,16 +585,19 @@ const EWayBillManagement = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Driver Name *</label>
-                    <input
-                      type="text"
+                    <select
                       name="driverName"
                       value={formData.driverName}
                       onChange={handleFormChange}
-                      placeholder="e.g., Rahul Kumar"
-                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary ${
+                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
                         formErrors.driverName ? 'border-red-500' : 'border-slate-300'
                       }`}
-                    />
+                    >
+                      <option value="">Select Driver</option>
+                      {drivers.slice(0, 100).map(d => (
+                        <option key={d.driver_id} value={d.driver_id}>{d.name || `Driver ${d.driver_id}`}</option>
+                      ))}
+                    </select>
                     {formErrors.driverName && <p className="text-red-500 text-xs mt-1">{formErrors.driverName}</p>}
                   </div>
 
@@ -765,7 +707,7 @@ const EWayBillManagement = () => {
                   </div>
                   <div>
                     <p className="text-xs text-slate-600">LR Number</p>
-                    <p className="text-sm font-semibold text-slate-900">{selectedBill.lrNumber}</p>
+                    <p className="text-sm font-semibold text-slate-900">{lrBills.find(lr => String(lr.lr_id) === String(selectedBill.lrNumber))?.lr_number || selectedBill.lrNumber}</p>
                   </div>
                 </div>
               </div>
@@ -812,7 +754,7 @@ const EWayBillManagement = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-slate-600">Vehicle Number</p>
-                    <p className="text-sm font-semibold text-slate-900">{selectedBill.vehicle}</p>
+                    <p className="text-sm font-semibold text-slate-900">{vehicles.find(v => String(v.vehicle_id) === String(selectedBill.vehicle))?.vehicle_number || selectedBill.vehicle}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600">Route</p>
@@ -820,7 +762,7 @@ const EWayBillManagement = () => {
                   </div>
                   <div>
                     <p className="text-xs text-slate-600">Driver</p>
-                    <p className="text-sm font-semibold text-slate-900">{selectedBill.driver}</p>
+                    <p className="text-sm font-semibold text-slate-900">{drivers.find(d => String(d.driver_id) === String(selectedBill.driver))?.name || selectedBill.driver}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600">Driver Phone</p>
@@ -937,13 +879,13 @@ const EWayBillManagement = () => {
           </thead>
           <tbody>
             {filteredBills.length > 0 ? (
-              filteredBills.map((bill, index) => (
+              filteredBills.slice((currentPage - 1) * 10, currentPage * 10).map((bill, index) => (
                 <tr key={index} className="border-b border-slate-100 hover:bg-slate-50 transition">
                   <td className="px-6 py-4 text-sm font-semibold text-primary cursor-pointer hover:underline">{bill.ewaybillNumber}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{bill.supplier}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{bill.buyer}</td>
                   <td className="px-6 py-4 text-sm font-semibold text-slate-900">{bill.amount}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{bill.vehicle}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700">{vehicles.find(v => String(v.vehicle_id) === String(bill.vehicle))?.vehicle_number || bill.vehicle}</td>
                   <td className="px-6 py-4 text-sm font-semibold">
                     <span className={`${bill.daysLeft < 1 ? 'text-red-600' : bill.daysLeft < 10 ? 'text-yellow-600' : 'text-green-600'}`}>
                       {bill.daysLeft}
@@ -993,6 +935,31 @@ const EWayBillManagement = () => {
             )}
           </tbody>
         </table>
+      </div>
+      {/* Pagination Footer */}
+      <div className="flex justify-between items-center mt-4 p-4 border-t border-slate-200">
+        <span className="text-sm text-slate-500">
+          Showing {Math.min(filteredBills.length, (currentPage - 1) * 10 + 1)} to {Math.min(filteredBills.length, currentPage * 10)} of {filteredBills.length} bills
+        </span>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg">
+            {currentPage}
+          </button>
+          <button 
+            onClick={() => setCurrentPage(currentPage + 1)}
+            disabled={currentPage * 10 >= filteredBills.length}
+            className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );

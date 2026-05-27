@@ -1,6 +1,6 @@
 import React from 'react';
 
-const StatCard = ({ icon, title, label, value, color, iconBg, iconColor }) => {
+const StatCard = ({ icon, title, label, value, color, iconBg }) => {
   const displayLabel = title || label; // Support both title and label props
   
   return (

@@ -12,6 +12,7 @@ import {
   Bar,
   CartesianGrid,
 } from "recharts";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import axios from "axios";
 
@@ -25,6 +26,7 @@ export default function TransportFuelTollPage() {
   // ------------------------------------------------------------------
   const [fuelData, setFuelData] = useState([]);
   const [tollData, setTollData] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
 
   const [showAddFuel, setShowAddFuel] = useState(false);
   const [showAddToll, setShowAddToll] = useState(false);
@@ -47,7 +49,9 @@ export default function TransportFuelTollPage() {
     photo: null,
   });
 
-  const [filterDates, setFilterDates] = useState({ start: "", end: "" });
+  const [filterDates] = useState({ start: "", end: "" });
+  const [fuelPage, setFuelPage] = useState(1);
+  const [tollPage, setTollPage] = useState(1);
 
   // ------------------------------------------------------------------
   // FETCH FROM BACKEND ON MOUNT
@@ -55,13 +59,15 @@ export default function TransportFuelTollPage() {
   useEffect(() => {
     const fetchFuelAndToll = async () => {
       try {
-        const [fuelRes, tollRes] = await Promise.all([
+        const [fuelRes, tollRes, vehicleRes] = await Promise.all([
           axios.get(FUEL_API_URL),
           axios.get(TOLL_API_URL),
+          axios.get('http://127.0.0.1:8000/api/vehicles/'),
         ]);
 
         setFuelData(fuelRes.data || []);
         setTollData(tollRes.data || []);
+        setVehicles(vehicleRes.data || []);
       } catch (err) {
         console.error("Error fetching fuel/toll data:", err.response?.data || err);
       }
@@ -441,7 +447,7 @@ export default function TransportFuelTollPage() {
                 Distribution of fuel vs toll costs
               </p>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minHeight={1} minWidth={1}>
               <PieChart>
                 <Pie
                   data={pieData}
@@ -484,7 +490,7 @@ export default function TransportFuelTollPage() {
                 Fuel and toll expenses over time
               </p>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minHeight={1} minWidth={1}>
               <BarChart data={barData}>
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -568,10 +574,9 @@ export default function TransportFuelTollPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Vehicle Number
+                      Vehicle
                     </label>
-                    <input
-                      placeholder="Enter vehicle number"
+                    <select
                       value={newFuel.vehicle}
                       onChange={(e) =>
                         setNewFuel({
@@ -579,9 +584,14 @@ export default function TransportFuelTollPage() {
                           vehicle: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 bg-white"
                       required
-                    />
+                    >
+                      <option value="">Select Vehicle</option>
+                      {vehicles.slice(0, 100).map(v => (
+                        <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -715,17 +725,17 @@ export default function TransportFuelTollPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredFuel.map((row, idx) => (
+                    filteredFuel.slice((fuelPage - 1) * 10, fuelPage * 10).map((row, idx) => (
                       <tr
                         key={row.fuel_id}
                         className="hover:bg-slate-50/70 transition-colors group"
                       >
                         <td className="py-4 px-6 text-slate-600 font-medium">
-                          {idx + 1}
+                          {(fuelPage - 1) * 10 + idx + 1}
                         </td>
                         <td className="py-4 px-6">
                           <span className="font-semibold text-slate-900 px-3 py-1 bg-slate-100 rounded-md">
-                            {row.vehicle}
+                            {vehicles.find(v => String(v.vehicle_id) === String(row.vehicle))?.vehicle_number || `Vehicle ${row.vehicle}`}
                           </span>
                         </td>
                         <td className="py-4 px-6">
@@ -776,6 +786,31 @@ export default function TransportFuelTollPage() {
                 </tbody>
               </table>
             </div>
+            {/* Fuel Pagination Footer */}
+            <div className="flex justify-between items-center mt-4 p-4 border-t border-slate-200 bg-slate-50">
+              <span className="text-sm text-slate-500">
+                Showing {Math.min(filteredFuel.length, (fuelPage - 1) * 10 + 1)} to {Math.min(filteredFuel.length, fuelPage * 10)} of {filteredFuel.length} entries
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setFuelPage(Math.max(1, fuelPage - 1))}
+                  disabled={fuelPage === 1}
+                  className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg shadow-sm">
+                  {fuelPage}
+                </button>
+                <button 
+                  onClick={() => setFuelPage(fuelPage + 1)}
+                  disabled={fuelPage * 10 >= filteredFuel.length}
+                  className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -820,10 +855,9 @@ export default function TransportFuelTollPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Vehicle Number
+                      Vehicle
                     </label>
-                    <input
-                      placeholder="Enter vehicle number"
+                    <select
                       value={newToll.vehicle}
                       onChange={(e) =>
                         setNewToll({
@@ -831,9 +865,14 @@ export default function TransportFuelTollPage() {
                           vehicle: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 bg-white"
                       required
-                    />
+                    >
+                      <option value="">Select Vehicle</option>
+                      {vehicles.slice(0, 100).map(v => (
+                        <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -965,17 +1004,17 @@ export default function TransportFuelTollPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredToll.map((row, idx) => (
+                    filteredToll.slice((tollPage - 1) * 10, tollPage * 10).map((row, idx) => (
                       <tr
                         key={row.toll_id}
                         className="hover:bg-slate-50/70 transition-colors group"
                       >
                         <td className="py-4 px-6 text-slate-600 font-medium">
-                          {idx + 1}
+                          {(tollPage - 1) * 10 + idx + 1}
                         </td>
                         <td className="py-4 px-6">
                           <span className="font-semibold text-slate-900 px-3 py-1 bg-slate-100 rounded-md">
-                            {row.vehicle}
+                            {vehicles.find(v => String(v.vehicle_id) === String(row.vehicle))?.vehicle_number || `Vehicle ${row.vehicle}`}
                           </span>
                         </td>
                         <td className="py-4 px-6 text-slate-700 font-medium">
@@ -1016,6 +1055,31 @@ export default function TransportFuelTollPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+            {/* Toll Pagination Footer */}
+            <div className="flex justify-between items-center mt-4 p-4 border-t border-slate-200 bg-slate-50">
+              <span className="text-sm text-slate-500">
+                Showing {Math.min(filteredToll.length, (tollPage - 1) * 10 + 1)} to {Math.min(filteredToll.length, tollPage * 10)} of {filteredToll.length} entries
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setTollPage(Math.max(1, tollPage - 1))}
+                  disabled={tollPage === 1}
+                  className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg shadow-sm">
+                  {tollPage}
+                </button>
+                <button 
+                  onClick={() => setTollPage(tollPage + 1)}
+                  disabled={tollPage * 10 >= filteredToll.length}
+                  className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         </section>

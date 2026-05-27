@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 
 // Custom truck icon
@@ -115,9 +116,9 @@ export default function FleetDashboard() {
     const filteredData = FLEET.filter((v) => {
       const matchesQuery =
         query === "" ||
-        v.id.toLowerCase().includes(query.toLowerCase()) ||
-        v.reg.toLowerCase().includes(query.toLowerCase()) ||
-        v.driver.toLowerCase().includes(query.toLowerCase());
+        String(v.id || "").toLowerCase().includes(query.toLowerCase()) ||
+        String(v.reg || "").toLowerCase().includes(query.toLowerCase()) ||
+        String(v.driver || "").toLowerCase().includes(query.toLowerCase());
       const matchesStatus = statusFilter === "All" || v.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
@@ -170,11 +171,11 @@ export default function FleetDashboard() {
           </div>
           <div className="flex items-center gap-3">
             <button className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors">
-              <span className="material-symbols-outlined text-[18px]">download</span>
+              <span className="material-symbols-outlined text-lg">download</span>
               <span className="text-sm">Export Report</span>
             </button>
             <button className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
-              <span className="material-symbols-outlined text-[18px]">add</span>
+              <span className="material-symbols-outlined text-lg">add</span>
               <span className="text-sm">Add Vehicle</span>
             </button>
           </div>
@@ -229,7 +230,7 @@ export default function FleetDashboard() {
                 <p className="text-sm text-slate-500">Last 7 days performance</p>
               </div>
               <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
                   <AreaChart data={utilization}>
                     <defs>
                       <linearGradient id="colorUtil" x1="0" y1="0" x2="0" y2="1">
@@ -278,7 +279,7 @@ export default function FleetDashboard() {
                 <p className="text-sm text-slate-500">Monthly expenditure breakdown</p>
               </div>
               <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
                   <BarChart data={fuelCosts}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis 
@@ -313,7 +314,7 @@ export default function FleetDashboard() {
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col h-full">
             <div className="p-6 border-b border-slate-100">
               <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px] text-indigo-600">location_on</span>
+                <span className="material-symbols-outlined text-xl text-indigo-600">location_on</span>
                 Live Tracking
               </h2>
             </div>
@@ -362,7 +363,7 @@ export default function FleetDashboard() {
 
             <div className="flex flex-col sm:flex-row gap-3 mt-4">
               <div className="flex-1 relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
                   search
                 </span>
                 <input
@@ -403,11 +404,11 @@ export default function FleetDashboard() {
                     <th
                       key={col.key}
                       onClick={() => handleSort(col.key)}
-                      className="px-5 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors"
+                      className="px-5 py-3 text-left text-xs font-semibold text-slate-700 uppercase cursor-pointer hover:bg-slate-100 transition-colors"
                     >
                       <div className="flex items-center gap-1">
                         {col.label}
-                        <span className="material-symbols-outlined text-[16px]">unfold_more</span>
+                        <span className="material-symbols-outlined text-base">unfold_more</span>
                       </div>
                     </th>
                   ))}
@@ -496,7 +497,7 @@ function AnimatedCard({ title, value, icon, iconBg, iconColor }) {
           </p>
         </div>
         <div className={`${iconBg} p-3 rounded-lg`}>
-          <span className={`material-symbols-outlined text-[20px] ${iconColor}`}>
+          <span className={`material-symbols-outlined text-xl ${iconColor}`}>
             {icon}
           </span>
         </div>

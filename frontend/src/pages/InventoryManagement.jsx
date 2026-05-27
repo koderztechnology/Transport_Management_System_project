@@ -1,5 +1,6 @@
 /* eslint-disable no-irregular-whitespace */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const InventoryManagement = () => {
   // ========================================
@@ -7,16 +8,34 @@ const InventoryManagement = () => {
   // ========================================
   
   // Main inventory data array
-  const [stockItems, setStockItems] = useState([
-    { id: 1, name: 'MRF Radial Tyres', category: 'Tyres', quantity: 45, unit: 'Nos', reorderLevel: 10 },
-    { id: 2, name: 'Engine Oil 5W-30', category: 'Oils', quantity: 120, unit: 'Ltr', reorderLevel: 20 },
-    { id: 3, name: 'Brake Pads Set', category: 'Spare Parts', quantity: 8, unit: 'Set', reorderLevel: 15 },
-    { id: 4, name: 'Air Filter', category: 'Spare Parts', quantity: 28, unit: 'Nos', reorderLevel: 10 },
-    { id: 5, name: 'Hydraulic Jack', category: 'Tools', quantity: 5, unit: 'Nos', reorderLevel: 8 },
-    { id: 6, name: 'Transmission Fluid', category: 'Oils', quantity: 75, unit: 'Ltr', reorderLevel: 25 },
-    { id: 7, name: 'Wiper Blades', category: 'Spare Parts', quantity: 32, unit: 'Set', reorderLevel: 12 },
-    { id: 8, name: 'Tool Kit Premium', category: 'Tools', quantity: 15, unit: 'Set', reorderLevel: 5 },
-  ]);
+  const [stockItems, setStockItems] = useState([]);
+  const [vendors, setVendors] = useState([]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [invRes, venRes] = await Promise.all([
+        axios.get("http://127.0.0.1:8000/api/inventory/"),
+        axios.get("http://127.0.0.1:8000/api/vendors/")
+      ]);
+      const mappedItems = invRes.data.map(item => ({
+        id: item.item_id,
+        name: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        reorderLevel: item.reorder_level,
+        vendor: item.vendor
+      }));
+      setStockItems(mappedItems);
+      setVendors(venRes.data);
+    } catch (err) {
+      console.error("Error fetching inventory data:", err);
+    }
+  };
 
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,8 +54,9 @@ const InventoryManagement = () => {
     name: '',
     category: '',
     quantity: '',
-    unit: '',
-    reorderLevel: ''
+    unit_price: '',
+    reorderLevel: '',
+    vendor: ''
   });
 
   // Form validation errors
@@ -55,8 +75,8 @@ const InventoryManagement = () => {
   const filteredStockItems = stockItems.filter(item => {
     const matchesCategory = filterCategory === 'All' || item.category === filterCategory;
     const matchesSearch = searchQuery === '' || 
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase());
+      String(item.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(item.category || "").toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
@@ -81,7 +101,7 @@ const InventoryManagement = () => {
     setIsEditMode(false);
     setEditingItemId(null);
     setFormData({
-      name: '', category: '', quantity: '', unit: '', reorderLevel: ''
+      name: '', category: '', quantity: '', unit_price: '', reorderLevel: '', vendor: ''
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -95,8 +115,9 @@ const InventoryManagement = () => {
       name: item.name,
       category: item.category,
       quantity: item.quantity.toString(),
-      unit: item.unit,
-      reorderLevel: item.reorderLevel.toString()
+      unit_price: item.unit_price || '',
+      reorderLevel: item.reorderLevel.toString(),
+      vendor: item.vendor || ''
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -108,7 +129,7 @@ const InventoryManagement = () => {
     setIsEditMode(false);
     setEditingItemId(null);
     setFormData({
-      name: '', category: '', quantity: '', unit: '', reorderLevel: ''
+      name: '', category: '', quantity: '', unit_price: '', reorderLevel: '', vendor: ''
     });
     setFormErrors({});
   };
@@ -134,14 +155,13 @@ const InventoryManagement = () => {
     if (!formData.name.trim()) errors.name = 'Item name is required';
     if (!formData.category) errors.category = 'Category is required';
     if (!formData.quantity || formData.quantity <= 0) errors.quantity = 'Quantity must be greater than 0';
-    if (!formData.unit.trim()) errors.unit = 'Unit is required';
     if (!formData.reorderLevel || formData.reorderLevel < 0) errors.reorderLevel = 'Reorder level must be 0 or greater';
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   // Submit form (Add or Edit)
-  const handleSubmitForm = (e) => {
+  const handleSubmitForm = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
       return;
@@ -151,36 +171,39 @@ const InventoryManagement = () => {
       name: formData.name.trim(),
       category: formData.category,
       quantity: parseInt(formData.quantity),
-      unit: formData.unit.trim(),
-      reorderLevel: parseInt(formData.reorderLevel)
+      unit_price: formData.unit_price || 0,
+      reorder_level: parseInt(formData.reorderLevel),
+      vendor: formData.vendor || null
     };
 
-    if (isEditMode) {
-      setStockItems(prev => prev.map(item => 
-        item.id === editingItemId 
-          ? { ...item, ...itemData }
-          : item
-      ));
-    } else {
-      const newItem = {
-        id: Math.max(...stockItems.map(i => i.id), 0) + 1, // Generate new ID
-        ...itemData
-      };
-      setStockItems(prev => [...prev, newItem]);
-    }
-    handleCloseModal();
+    try {
+      if (isEditMode) {
+        await axios.put(`http://127.0.0.1:8000/api/inventory/${editingItemId}/`, itemData);
+      } else {
+        await axios.post("http://127.0.0.1:8000/api/inventory/", itemData);
+      }
+      fetchData();
+      handleCloseModal();
+    } catch(err) {
+      console.error(err);
+    }
   };
 
   // ========================================
   // DELETE FUNCTIONALITY
   // ========================================
 
-  const handleDeleteItem = (item) => {
+  const handleDeleteItem = async (item) => {
     const confirmed = window.confirm(
       `Are you sure you want to delete "${item.name}"?\n\nThis action cannot be undone.`
     );
     if (confirmed) {
-      setStockItems(prev => prev.filter(i => i.id !== item.id));
+      try {
+        await axios.delete(`http://127.0.0.1:8000/api/inventory/${item.id}/`);
+        fetchData();
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -367,7 +390,10 @@ const InventoryManagement = () => {
   	  				Quantity
   	  			  </th>
   	  			  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-  	  				Unit
+  	  				Unit Price
+  	  			  </th>
+  	  			  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+  	  				Vendor
   	  			  </th>
   	  			  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
   	  				Status
@@ -385,7 +411,7 @@ const InventoryManagement = () => {
   	  				</td>
   	  			  </tr>
   	  			) : (
-  	  			  filteredStockItems.map((item) => {
+  	  			  filteredStockItems.slice((currentPage - 1) * 10, currentPage * 10).map((item) => {
   	  				const status = getStockStatus(item);
   	  				return (
   	  				  <tr
@@ -402,7 +428,10 @@ const InventoryManagement = () => {
   	  					  {item.quantity}
   	  					</td>
   	  					<td className="px-5 py-4 text-sm text-slate-600">
-  	  					  {item.unit}
+  	  					  {item.unit_price}
+  	  					</td>
+  	  					<td className="px-5 py-4 text-sm text-slate-600">
+  	  					  {vendors.find(v => String(v.vendor_id) === String(item.vendor))?.name || item.vendor}
   	  					</td>
   	  					<td className="px-5 py-4">
   	  					  <span className={`px-3 py-1 rounded-full text-xs font-medium ${status.class}`}>
@@ -446,6 +475,31 @@ const InventoryManagement = () => {
   	  		  </tbody>
   	  		</table>
   	  	  </div>
+          {/* Pagination Footer */}
+          <div className="flex justify-between items-center p-5 border-t border-slate-200">
+            <span className="text-sm text-slate-500">
+              Showing {Math.min(filteredStockItems.length, (currentPage - 1) * 10 + 1)} to {Math.min(filteredStockItems.length, currentPage * 10)} of {filteredStockItems.length} items
+            </span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg">
+                {currentPage}
+              </button>
+              <button 
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage * 10 >= filteredStockItems.length}
+                className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
   	  	</div>
 
   	  	{/* Item Issue Log & Categories Overview (No change needed) */}
@@ -681,23 +735,19 @@ const InventoryManagement = () => {
 
       	  {/* <-- MODIFIED: Wrapped Unit and Reorder Level in a grid --> */}
       	  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      	  	{/* Unit */}
+      	  	{/* Unit Price */}
       	  	<div>
       	  	  <label className="block text-sm font-medium text-slate-700 mb-2">
-      	  		Unit <span className="text-red-500">*</span>
+      	  		Unit Price
       	  	  </label>
       	  	  <input
-      	  		type="text"
-      	  		name="unit"
-      	  		value={formData.unit}
+      	  		type="number"
+      	  		name="unit_price"
+      	  		value={formData.unit_price}
       	  		onChange={handleInputChange}
-      	  		className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all placeholder:text-slate-400 
-s     	  		${formErrors.unit ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 focus:ring-primary'}`}
-      	  		placeholder="e.g., Nos, Ltr, Set"
+      	  		className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all placeholder:text-slate-400"
+      	  		placeholder="e.g., 20"
       	  	  />
-      	  	  {formErrors.unit && (
-      	  		<p className="mt-1 text-sm text-red-500">{formErrors.unit}</p>
-      	  	  )}
       	  	</div>
 
       	  	{/* Reorder Level */}
@@ -719,7 +769,21 @@ s     	  		${formErrors.unit ? 'border-red-500 focus:ring-red-500' : 'border-s
   	  			<p className="mt-1 text-sm text-red-500">{formErrors.reorderLevel}</p>
   	  		  )}
   	  		</div>
-  	  	  </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Vendor</label>
+            <select
+              name="vendor"
+              value={formData.vendor}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all bg-white"
+            >
+              <option value="">Select Vendor</option>
+              {vendors.slice(0, 100).map(v => (
+                <option key={v.vendor_id} value={v.vendor_id}>{v.name || `Vendor ${v.vendor_id}`}</option>
+              ))}
+            </select>
+          </div>
 
   	  	  {/* Submit Button */}
   	  	  <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">

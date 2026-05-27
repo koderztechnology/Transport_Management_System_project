@@ -65,7 +65,7 @@ const BalanceSheet = () => {
 
   const equity = totalAssets - totalLiabilities;
 
-  const Section = ({ title, items, total, sectionKey, isRightColumn = false }) => (
+  const Section = ({ title, items, total, sectionKey }) => (
     <div className="bg-slate-50 dark:bg-slate-700/30 rounded-lg p-4 mb-4">
       <button
         onClick={() => toggleSection(sectionKey)}

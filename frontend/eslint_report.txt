@@ -1,0 +1,50 @@
+﻿
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\components\AccountsFinance\BalanceSheet.jsx
+  68:55  error  'isRightColumn' is assigned a value but never used  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\components\AccountsFinance\FinancialReports.jsx
+  1:10  error  'useState' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\components\AccountsFinance\IncomeExpenseChart.jsx
+  4:31  error  'dateRange' is defined but never used  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\components\AccountsFinance\PaymentTracking.jsx
+  4:10  error  'activeView' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+  4:22  error  'setActiveView' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\components\AccountsFinance\ProfitLoss.jsx
+  3:23  error  'dateRange' is defined but never used  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\components\AccountsFinance\QuickActionsPanel.jsx
+  4:10  error  'isExpanded' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+  4:22  error  'setIsExpanded' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\components\StatCard.jsx
+  3:63  error  'iconColor' is defined but never used  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\pages\Dashboard.jsx
+  225:9  error  'expenseData' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u       no-unused-vars
+  233:9  error  'recentActivities' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\pages\Diesel_Toll_Management.jsx
+  15:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                   no-unused-vars
+  50:23  error  'setFilterDates' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\pages\Fleet_Management.jsx
+  22:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\pages\LRManagement.jsx
+  21:7  error  'generateDummyLR' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\pages\Support.jsx
+  34:14  error  'e' is defined but never used  no-unused-vars
+  51:16  error  'e' is defined but never used  no-unused-vars
+
+D:\Koderz_T\Admin_TSm_all\Transport_management\frontend\src\pages\Tracking_Analytics.jsx
+   97:17  error  'setTrips' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u      no-unused-vars
+   98:21  error  'setTripStats' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  119:24  error  'i' is defined but never used                                                                 no-unused-vars
+  207:16  error  'e' is defined but never used                                                                 no-unused-vars
+
+Γ£û 21 problems (21 errors, 0 warnings)
+

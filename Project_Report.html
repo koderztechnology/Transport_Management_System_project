@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Architecture & Technology Stack Report</title>
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            color: #1e3a8a;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2563eb;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #475569;
+        }
+        ul {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        strong {
+            color: #0f172a;
+        }
+        .header-section {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-section">
+        <h1>Project Architecture & Technology Stack Report</h1>
+        <p class="subtitle">Transport Management System (Admin Panel)</p>
+    </div>
+
+    <p>This document outlines the libraries, technologies, integration mechanisms, and testing tools utilized across the project.</p>
+
+    <h2>1. Technologies & Libraries Used</h2>
+
+    <h3>Frontend (Client-Side)</h3>
+    <p>The frontend is a single-page application built using modern web technologies to ensure a fast, responsive, and highly interactive user experience.</p>
+    <ul>
+        <li><strong>Core Framework:</strong> React (v19)</li>
+        <li><strong>Build Tool:</strong> Vite (Provides lightweight, fast hot module replacement and optimized production builds.)</li>
+        <li><strong>Styling:</strong> Tailwind CSS (Utility-first CSS framework used for designing visually stunning and consistent UI components.)</li>
+        <li><strong>Routing:</strong> React Router DOM (Handles client-side routing, protected routes, and navigation without page reloads.)</li>
+        <li><strong>API Client:</strong> Axios (Promise-based HTTP client used to seamlessly fetch data from the backend.)</li>
+        <li><strong>Data Visualization:</strong> Recharts (Used for rendering dynamic charts and graphs on the dashboard.)</li>
+        <li><strong>Maps & Geolocation:</strong> Leaflet & React-Leaflet (Integrated for tracking and map-based features.)</li>
+        <li><strong>Animations:</strong> Framer Motion</li>
+    </ul>
+
+    <h3>Backend (Server-Side)</h3>
+    <p>The backend acts as a robust API server, dealing with business logic, database management, and authentication.</p>
+    <ul>
+        <li><strong>Core Language:</strong> Python</li>
+        <li><strong>Framework:</strong> Django (A high-level Python web framework that encourages rapid development.)</li>
+        <li><strong>API Architecture:</strong> Django REST Framework (DRF) (Powerful toolkit for building Web APIs, handling serialization, routing, and viewsets.)</li>
+        <li><strong>Database:</strong> MySQL (Relational database management system used to store all persistent data such as Trips, Vehicles, Users, and Transactions.)</li>
+    </ul>
+
+    <h2>2. Frontend to Backend Connection Mechanism</h2>
+    <p>The frontend and backend are completely decoupled and communicate over the HTTP protocol in a standard Client-Server architecture.</p>
+    <ul>
+        <li><strong>Data Format:</strong> They exchange data exclusively using <strong>JSON</strong> (JavaScript Object Notation).</li>
+        <li><strong>Communication Flow:</strong>
+            <ul>
+                <li>The React frontend uses the <strong>Axios</strong> library to make REST API calls (GET, POST, PUT, DELETE) to specific backend endpoints (e.g., <code>http://127.0.0.1:8000/api/login/</code>).</li>
+                <li>The backend accepts the request. Due to the decoupled nature, the backend is configured using <strong>CORS</strong> (Cross-Origin Resource Sharing) to authorize incoming requests from the frontend's origin (e.g., <code>localhost:5173</code>).</li>
+                <li>Django processes the logic, queries the MySQL database via ORM, and uses DRF Serializers to turn complex Python objects into JSON.</li>
+                <li>The JSON response is sent back to the frontend, where Axios resolves the promise, and React re-renders the UI with the fresh data.</li>
+            </ul>
+        </li>
+        <li><strong>Security/State:</strong> Important frontend state like authentication is maintained using browser features like <code>localStorage</code>, checking permissions on protected routes natively within React Router.</li>
+    </ul>
+
+    <h2>3. API Testing Methodology</h2>
+    <p>To guarantee that the backend endpoints operate correctly before connecting them to the frontend UI, dedicated API testing is performed.</p>
+    <ul>
+        <li><strong>Tool Used:</strong> <strong>Postman</strong></li>
+        <li><strong>Implementation:</strong> A dedicated Postman collection (<code>postman_collection.json</code>) is maintained within the backend directory.</li>
+        <li><strong>Workflow:</strong>
+            <ul>
+                <li>Developers use Postman to configure requests with appropriate HTTP methods, headers (such as <code>Content-Type: application/json</code>), and request bodies.</li>
+                <li>This allows isolated testing of endpoints (e.g., validating that <code>/api/signup/</code> successfully creates a database record, or that <code>GET /api/vehicles/</code> returns the proper JSON structure) without needing any frontend intervention.</li>
+                <li>Postman handles testing for various HTTP status codes ensuring responses conform to the required constraints.</li>
+            </ul>
+        </li>
+    </ul>
+    
+    <hr style="margin-top: 50px; border: 0; border-top: 1px solid #e2e8f0;">
+    <p style="text-align: center; color: #94a3b8; font-size: 0.9rem;">Transport Management System - Technical Report</p>
+
+</body>
+</html>

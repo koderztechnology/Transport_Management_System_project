@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
 
-const IncomeExpenseChart = ({ dateRange }) => {
+const IncomeExpenseChart = () => {
   const [data] = useState([
     { month: 'Jan', income: 650000, expenses: 420000 },
     { month: 'Feb', income: 720000, expenses: 480000 },
@@ -51,7 +51,7 @@ const IncomeExpenseChart = ({ dateRange }) => {
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={350} minHeight={1} minWidth={1}>
         <ComposedChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
           <XAxis 

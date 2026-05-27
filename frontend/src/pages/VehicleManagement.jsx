@@ -1,4 +1,5 @@
-  import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const VehicleManagement = () => {
   // ============================================================
@@ -9,6 +10,7 @@ const VehicleManagement = () => {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Form data for adding new vehicle
   const [formData, setFormData] = useState({
@@ -37,220 +39,57 @@ const VehicleManagement = () => {
   const [formErrors, setFormErrors] = useState({});
 
   // ============================================================
-  // SAMPLE VEHICLES DATA
+  // DATA STATES
   // ============================================================
-  const [vehicles, setVehicles] = useState([
-    {
-      id: 'VEH-001',
-      vehicleNumber: 'MH12AB3456',
-      vehicleType: 'Truck',
-      owner: 'Shree Logistics',
-      model: 'Tata 2523',
-      year: 2020,
-      capacity: '25 MT',
-      gvwr: '2300 kg',
-      mileage: '45,230 km',
-      lastService: '2025-01-10',
-      nextServiceDue: '2025-04-10',
-      insurance: {
-        provider: 'ICICI General Insurance',
-        expiryDate: '2025-08-15',
-        daysLeft: 210,
-      },
-      pollution: {
-        expiryDate: '2025-06-20',
-        daysLeft: 155,
-      },
-      fitness: {
-        expiryDate: '2025-12-30',
-        daysLeft: 347,
-      },
-      roadTax: {
-        expiryDate: '2026-01-15',
-        daysLeft: 362,
-      },
-      gps_tracker: 'GPS-12345',
-      status: 'Active',
-      statusColor: 'bg-green-100 text-green-800',
-      totalTrips: 156,
-      totalEarnings: '₹8,45,000',
-      createdAt: '2020-06-15',
-      documentsStatus: {
-        insurance: 'valid',
-        pollution: 'valid',
-        fitness: 'valid',
-        roadTax: 'valid',
-      },
-    },
-    {
-      id: 'VEH-002',
-      vehicleNumber: 'GJ01CD7890',
-      vehicleType: 'Truck',
-      owner: 'Shree Logistics',
-      model: 'Volvo FM 450',
-      year: 2021,
-      capacity: '20 MT',
-      gvwr: '2500 kg',
-      mileage: '38,450 km',
-      lastService: '2025-01-05',
-      nextServiceDue: '2025-04-05',
-      insurance: {
-        provider: 'Bajaj Allianz',
-        expiryDate: '2025-05-20',
-        daysLeft: 123,
-      },
-      pollution: {
-        expiryDate: '2025-03-15',
-        daysLeft: 57,
-      },
-      fitness: {
-        expiryDate: '2025-11-10',
-        daysLeft: 297,
-      },
-      roadTax: {
-        expiryDate: '2026-02-28',
-        daysLeft: 402,
-      },
-      gps_tracker: 'GPS-12346',
-      status: 'Active',
-      statusColor: 'bg-green-100 text-green-800',
-      totalTrips: 143,
-      totalEarnings: '₹7,82,000',
-      createdAt: '2021-03-20',
-      documentsStatus: {
-        insurance: 'valid',
-        pollution: 'expiring_soon',
-        fitness: 'valid',
-        roadTax: 'valid',
-      },
-    },
-    {
-      id: 'VEH-003',
-      vehicleNumber: 'DL08EF1234',
-      vehicleType: 'Truck',
-      owner: 'Shree Logistics',
-      model: 'Ashok Leyland 1618',
-      year: 2019,
-      capacity: '18 MT',
-      gvwr: '1800 kg',
-      mileage: '68,900 km',
-      lastService: '2024-12-20',
-      nextServiceDue: '2025-03-20',
-      insurance: {
-        provider: 'United India Insurance',
-        expiryDate: '2025-04-10',
-        daysLeft: 83,
-      },
-      pollution: {
-        expiryDate: '2025-02-15',
-        daysLeft: 29,
-      },
-      fitness: {
-        expiryDate: '2025-09-05',
-        daysLeft: 231,
-      },
-      roadTax: {
-        expiryDate: '2026-03-10',
-        daysLeft: 451,
-      },
-      gps_tracker: 'GPS-12347',
-      status: 'Active',
-      statusColor: 'bg-green-100 text-green-800',
-      totalTrips: 187,
-      totalEarnings: '₹9,23,000',
-      createdAt: '2019-05-10',
-      documentsStatus: {
-        insurance: 'expiring_soon',
-        pollution: 'expiring_soon',
-        fitness: 'valid',
-        roadTax: 'valid',
-      },
-    },
-    {
-      id: 'VEH-004',
-      vehicleNumber: 'MH14GH5678',
-      vehicleType: 'Truck',
-      owner: 'Shree Logistics',
-      model: 'Hino 700 Series',
-      year: 2022,
-      capacity: '22 MT',
-      gvwr: '2200 kg',
-      mileage: '32,100 km',
-      lastService: '2025-01-15',
-      nextServiceDue: '2025-04-15',
-      insurance: {
-        provider: 'HDFC Ergo',
-        expiryDate: '2025-07-20',
-        daysLeft: 185,
-      },
-      pollution: {
-        expiryDate: '2025-07-10',
-        daysLeft: 175,
-      },
-      fitness: {
-        expiryDate: '2026-01-20',
-        daysLeft: 363,
-      },
-      roadTax: {
-        expiryDate: '2026-04-30',
-        daysLeft: 502,
-      },
-      gps_tracker: 'GPS-12348',
-      status: 'Active',
-      statusColor: 'bg-green-100 text-green-800',
-      totalTrips: 98,
-      totalEarnings: '₹5,67,000',
-      createdAt: '2022-04-12',
-      documentsStatus: {
-        insurance: 'valid',
-        pollution: 'valid',
-        fitness: 'valid',
-        roadTax: 'valid',
-      },
-    },
-    {
-      id: 'VEH-005',
-      vehicleNumber: 'KA01IJ9012',
-      vehicleType: 'Truck',
-      owner: 'Shree Logistics',
-      model: 'MAN TGX 470',
-      year: 2021,
-      capacity: '25 MT',
-      gvwr: '2400 kg',
-      mileage: '41,600 km',
-      lastService: '2024-11-15',
-      nextServiceDue: '2025-02-15',
-      insurance: {
-        provider: 'Reliance Insurance',
-        expiryDate: '2025-02-20',
-        daysLeft: 34,
-      },
-      pollution: {
-        expiryDate: '2025-01-25',
-        daysLeft: 8,
-      },
-      fitness: {
-        expiryDate: '2025-08-15',
-        daysLeft: 210,
-      },
-      roadTax: {
-        expiryDate: '2025-12-31',
-        daysLeft: 348,
-      },
-      gps_tracker: 'GPS-12349',
-      status: 'Maintenance',
-      statusColor: 'bg-yellow-100 text-yellow-800',
-      totalTrips: 125,
-      totalEarnings: '₹6,78,000',
-      createdAt: '2021-08-22',
-      documentsStatus: {
-        insurance: 'expiring_soon',
-        pollution: 'critical',
-        fitness: 'valid',
-        roadTax: 'valid',
-      },
-    },
-  ]);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+
+  useEffect(() => {
+    fetchVehicles();
+    fetchDrivers();
+  }, []);
+
+  const fetchDrivers = async () => {
+    try {
+      const res = await axios.get('http://127.0.0.1:8000/api/drivers/');
+      setDrivers(res.data);
+    } catch (err) {
+      console.error("Error fetching drivers:", err);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    try {
+      const res = await axios.get('http://127.0.0.1:8000/api/vehicles/');
+      const apiVehicles = res.data.map(v => ({
+        id: v.vehicle_id,
+        vehicleNumber: v.vehicle_number || '',
+        vehicleType: v.make || 'Truck',
+        owner: v.driver || '', // Driver ID now
+        model: v.model || '',
+        year: 2020,
+        capacity: v.capacity || '',
+        gvwr: '',
+        mileage: '0 km',
+        lastService: 'Pending',
+        nextServiceDue: 'Pending',
+        insurance: { provider: 'Not Provided', expiryDate: 'Not Provided', daysLeft: 0 },
+        pollution: { expiryDate: 'Not Provided', daysLeft: 0 },
+        fitness: { expiryDate: 'Not Provided', daysLeft: 0 },
+        roadTax: { expiryDate: 'Not Provided', daysLeft: 0 },
+        gps_tracker: 'Not Assigned',
+        status: v.status || 'Active',
+        statusColor: v.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800',
+        totalTrips: 0,
+        totalEarnings: '₹0',
+        createdAt: v.added_date ? v.added_date.split('T')[0] : '',
+        documentsStatus: { insurance: 'valid', pollution: 'valid', fitness: 'valid', roadTax: 'valid' }
+      }));
+      setVehicles(apiVehicles);
+    } catch (err) {
+      console.error("Error fetching vehicles:", err);
+    }
+  };
 
   // ============================================================
   // STATISTICS
@@ -298,84 +137,55 @@ const VehicleManagement = () => {
     }
   };
 
-  const handleAddVehicle = (e) => {
+  const handleAddVehicle = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) {
       alert('Please fill all required fields correctly');
       return;
     }
 
-    const newVehicle = {
-      id: `VEH-${String(vehicles.length + 1).padStart(3, '0')}`,
-      vehicleNumber: formData.vehicleNumber,
-      vehicleType: formData.vehicleType,
-      owner: formData.ownerName,
+    const payload = {
+      vehicle_number: formData.vehicleNumber,
+      make: formData.vehicleType,
       model: formData.modelName,
-      year: parseInt(formData.manufacturingYear),
       capacity: formData.capacity,
-      gvwr: formData.gvwr,
-      mileage: formData.currentMileage || '0 km',
-      lastService: formData.lastServiceDate || 'N/A',
-      nextServiceDue: 'Pending',
-      insurance: {
-        provider: formData.insuranceProvider || 'Not Provided',
-        expiryDate: formData.insuranceExpiry || 'Not Provided',
-        daysLeft: formData.insuranceExpiry ? Math.ceil((new Date(formData.insuranceExpiry) - new Date()) / (1000 * 60 * 60 * 24)) : 0,
-      },
-      pollution: {
-        expiryDate: formData.pollutionExpiry || 'Not Provided',
-        daysLeft: formData.pollutionExpiry ? Math.ceil((new Date(formData.pollutionExpiry) - new Date()) / (1000 * 60 * 60 * 24)) : 0,
-      },
-      fitness: {
-        expiryDate: formData.fitnessExpiry || 'Not Provided',
-        daysLeft: formData.fitnessExpiry ? Math.ceil((new Date(formData.fitnessExpiry) - new Date()) / (1000 * 60 * 60 * 24)) : 0,
-      },
-      roadTax: {
-        expiryDate: formData.roadTaxExpiry || 'Not Provided',
-        daysLeft: formData.roadTaxExpiry ? Math.ceil((new Date(formData.roadTaxExpiry) - new Date()) / (1000 * 60 * 60 * 24)) : 0,
-      },
-      gps_tracker: formData.gps_trackerNumber || 'Not Assigned',
-      status: 'Active',
-      statusColor: 'bg-green-100 text-green-800',
-      totalTrips: 0,
-      totalEarnings: '₹0',
-      createdAt: new Date().toISOString().split('T')[0],
-      documentsStatus: {
-        insurance: 'valid',
-        pollution: 'valid',
-        fitness: 'valid',
-        roadTax: 'valid',
-      },
+      driver: formData.ownerName || null,
+      status: 'Available'
     };
 
-    setVehicles(prev => [newVehicle, ...prev]);
-    
-    setFormData({
-      vehicleNumber: '',
-      vehicleType: 'Truck',
-      ownerName: '',
-      ownerPhone: '',
-      modelName: '',
-      manufacturingYear: '',
-      chassisNumber: '',
-      engineNumber: '',
-      insuranceProvider: '',
-      insuranceExpiry: '',
-      pollutionExpiry: '',
-      fitnessExpiry: '',
-      roadTaxExpiry: '',
-      capacity: '',
-      gvwr: '',
-      currentMileage: '',
-      lastServiceDate: '',
-      gps_trackerNumber: '',
-      totalTrips: '',
-      totalEarnings: '',
-    });
-    setFormErrors({});
-    setShowAddModal(false);
-    alert('Vehicle added successfully!');
+    try {
+      await axios.post('http://127.0.0.1:8000/api/vehicles/', payload);
+      fetchVehicles();
+      
+      setFormData({
+        vehicleNumber: '',
+        vehicleType: 'Truck',
+        ownerName: '',
+        ownerPhone: '',
+        modelName: '',
+        manufacturingYear: '',
+        chassisNumber: '',
+        engineNumber: '',
+        insuranceProvider: '',
+        insuranceExpiry: '',
+        pollutionExpiry: '',
+        fitnessExpiry: '',
+        roadTaxExpiry: '',
+        capacity: '',
+        gvwr: '',
+        currentMileage: '',
+        lastServiceDate: '',
+        gps_trackerNumber: '',
+        totalTrips: '',
+        totalEarnings: '',
+      });
+      setFormErrors({});
+      setShowAddModal(false);
+      alert('Vehicle added successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Error adding vehicle');
+    }
   };
 
   const handleViewDetails = (vehicle) => {
@@ -383,28 +193,28 @@ const VehicleManagement = () => {
     setShowDetailsModal(true);
   };
 
-  const handleDeleteVehicle = (vehicleId) => {
+  const handleDeleteVehicle = async (vehicleId) => {
     if (window.confirm('Are you sure you want to delete this vehicle? This action cannot be undone.')) {
-      setVehicles(prev => prev.filter(v => v.id !== vehicleId));
-      alert('Vehicle deleted successfully');
+      try {
+        await axios.delete(`http://127.0.0.1:8000/api/vehicles/${vehicleId}/`);
+        fetchVehicles();
+        alert('Vehicle deleted successfully');
+      } catch (err) {
+        console.error(err);
+        alert('Error deleting vehicle');
+      }
     }
   };
 
-  const handleUpdateStatus = (vehicleId, newStatus) => {
-    setVehicles(prev => prev.map(v => 
-      v.id === vehicleId
-        ? {
-          ...v,
-          status: newStatus,
-          statusColor: newStatus === 'Active' 
-            ? 'bg-green-100 text-green-800'
-            : newStatus === 'Maintenance'
-            ? 'bg-yellow-100 text-yellow-800'
-            : 'bg-red-100 text-red-800',
-        }
-        : v
-    ));
-    alert(`Vehicle status updated to ${newStatus}`);
+  const handleUpdateStatus = async (vehicleId, newStatus) => {
+    try {
+      await axios.patch(`http://127.0.0.1:8000/api/vehicles/${vehicleId}/`, { status: newStatus });
+      fetchVehicles();
+      alert(`Vehicle status updated to ${newStatus}`);
+    } catch (err) {
+      console.error(err);
+      alert('Error updating status');
+    }
   };
 
   // ============================================================
@@ -412,9 +222,9 @@ const VehicleManagement = () => {
   // ============================================================
   const filteredVehicles = vehicles.filter(vehicle => {
     const matchesSearch = 
-      vehicle.vehicleNumber.includes(searchQuery) ||
-      vehicle.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vehicle.owner.toLowerCase().includes(searchQuery.toLowerCase());
+      String(vehicle.vehicleNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(vehicle.model || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(vehicle.owner || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = filterStatus === 'all' || vehicle.status === filterStatus;
 
@@ -599,17 +409,20 @@ const VehicleManagement = () => {
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Owner Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Owner Name *</label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Driver (Optional)</label>
+                    <select
                       name="ownerName"
                       value={formData.ownerName}
                       onChange={handleFormChange}
-                      placeholder="e.g., Shree Logistics"
                       className={`w-full px-4 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
                         formErrors.ownerName ? 'border-red-500' : 'border-slate-200'
                       }`}
-                    />
+                    >
+                      <option value="">Select Driver</option>
+                      {drivers.slice(0, 100).map(d => (
+                        <option key={d.driver_id} value={d.driver_id}>{d.name || `Driver ${d.driver_id}`}</option>
+                      ))}
+                    </select>
                     {formErrors.ownerName && <p className="text-red-500 text-xs mt-1">{formErrors.ownerName}</p>}
                   </div>
 
@@ -1089,7 +902,7 @@ const VehicleManagement = () => {
           </thead>
           <tbody>
             {filteredVehicles.length > 0 ? (
-              filteredVehicles.map((vehicle, index) => (
+              filteredVehicles.slice((currentPage - 1) * 10, currentPage * 10).map((vehicle, index) => (
                 <tr key={index} className="border-b border-slate-100 hover:bg-slate-50 transition">
                   <td className="px-6 py-4 text-sm font-semibold text-indigo-600 cursor-pointer hover:underline">{vehicle.vehicleNumber}</td>
                   <td className="px-6 py-4 text-sm text-slate-700">{vehicle.vehicleType}</td>
@@ -1141,6 +954,31 @@ const VehicleManagement = () => {
             )}
           </tbody>
         </table>
+      </div>
+      {/* Pagination Footer */}
+      <div className="flex justify-between items-center mt-4 p-4 border-t border-slate-200">
+        <span className="text-sm text-slate-500">
+          Showing {Math.min(filteredVehicles.length, (currentPage - 1) * 10 + 1)} to {Math.min(filteredVehicles.length, currentPage * 10)} of {filteredVehicles.length} vehicles
+        </span>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg">
+            {currentPage}
+          </button>
+          <button 
+            onClick={() => setCurrentPage(currentPage + 1)}
+            disabled={currentPage * 10 >= filteredVehicles.length}
+            className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );

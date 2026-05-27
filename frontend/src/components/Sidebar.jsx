@@ -39,6 +39,34 @@ const Sidebar = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  const userRole = localStorage.getItem('user_role') || 'Admin';
+
+  const isItemAllowed = (href) => {
+    if (userRole === 'Admin') return true;
+    const rules = {
+        '/fleet-management': ['Manager'],
+        '/vehicle-management': ['Manager'],
+        '/trip-management': ['Manager', 'Driver'],
+        '/driver-management': ['Manager', 'Driver'],
+        '/diesel-toll-management': ['Manager'],
+        '/lr-management': ['Manager'],
+        '/eway-bill-management': ['Manager'],
+        '/accounts-finance': ['Manager', 'Vendor'],
+        '/vendor-management': ['Manager', 'Vendor'],
+        '/inventory': ['Manager'],
+        '/tracking-analytics': ['Manager', 'Driver'],
+        '/system-settings': [],
+    };
+    if (href === '/' || href.startsWith('#')) return true;
+    if (rules[href] && rules[href].includes(userRole)) return true;
+    return false;
+  };
+
+  const filteredSections = navigationSections.map(section => ({
+    ...section,
+    items: section.items.filter(item => isItemAllowed(item.href))
+  })).filter(section => section.items.length > 0);
+
   return (
     <>
       {/* Mobile Menu Toggle Button */}
@@ -90,7 +118,7 @@ const Sidebar = () => {
 
             {/* Navigation Sections */}
             <div className="space-y-6">
-              {navigationSections.map((section, sectionIndex) => (
+              {filteredSections.map((section, sectionIndex) => (
                 <div key={sectionIndex}>
                   <h3 className="px-2 mb-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     {section.title}
@@ -137,6 +165,7 @@ const Sidebar = () => {
 
           {/* Bottom Section */}
           <div className="border-t border-slate-200 px-3 py-3 bg-slate-50/50">
+            {isItemAllowed('/system-settings') && (
             <Link
               className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full mb-1 ${
                 location.pathname === '/system-settings'
@@ -157,6 +186,7 @@ const Sidebar = () => {
                 System Settings
               </span>
             </Link>
+            )}
             <Link
               className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full ${
                 location.pathname === '/support'

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const ProfitLoss = ({ dateRange }) => {
+const ProfitLoss = () => {
   const [period, setPeriod] = useState('month');
 
   const plData = {

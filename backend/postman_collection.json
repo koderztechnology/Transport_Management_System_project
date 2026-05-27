@@ -1,0 +1,696 @@
+{
+  "info": {
+    "_postman_id": "1f8f3c7e-b6a3-41a4-9e32-a5e2d6b3c9a0",
+    "name": "Transport Management APIs",
+    "description": "API collection for Driver, Fuel, and Toll Management in Django backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Drivers",
+      "item": [
+        {
+          "name": "Get All Drivers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/drivers/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "drivers",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Driver",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "John Doe",
+                  "type": "text"
+                },
+                {
+                  "key": "license",
+                  "value": "MH12123456",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "9876543210",
+                  "type": "text"
+                },
+                {
+                  "key": "experience",
+                  "value": "5 Years",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "value": "Active",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/drivers/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "drivers",
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fuel",
+      "item": [
+        {
+          "name": "Get All Fuel Entries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/fuel/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "fuel",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Fuel Entry",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "vehicle",
+                  "value": "MH10A1111",
+                  "type": "text"
+                },
+                {
+                  "key": "litres",
+                  "value": "45.5",
+                  "type": "text"
+                },
+                {
+                  "key": "price_per_litre",
+                  "value": "95.00",
+                  "type": "text"
+                },
+                {
+                  "key": "date",
+                  "value": "2023-10-15",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/fuel/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "fuel",
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Toll",
+      "item": [
+        {
+          "name": "Get All Toll Entries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/toll/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "toll",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Toll Entry",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "vehicle",
+                  "value": "MH10A1111",
+                  "type": "text"
+                },
+                {
+                  "key": "toll_name",
+                  "value": "Mumbai-Pune Expressway",
+                  "type": "text"
+                },
+                {
+                  "key": "amount",
+                  "value": "320.00",
+                  "type": "text"
+                },
+                {
+                  "key": "date",
+                  "value": "2023-10-15",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/toll/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "toll",
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vehicles",
+      "item": [
+        {
+          "name": "Get All Vehicles",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/vehicles/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "vehicles",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Vehicle",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "vehicle_number",
+                  "value": "MH12AB3456",
+                  "type": "text"
+                },
+                {
+                  "key": "make",
+                  "value": "Tata",
+                  "type": "text"
+                },
+                {
+                  "key": "model",
+                  "value": "Prima",
+                  "type": "text"
+                },
+                {
+                  "key": "capacity",
+                  "value": "40 Tons",
+                  "type": "text"
+                },
+                {
+                  "key": "driver_name",
+                  "value": "Ramesh",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "value": "Available",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/vehicles/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "vehicles",
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trips",
+      "item": [
+        {
+          "name": "Get All Trips",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/trips/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "trips",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Trip",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "vehicle_id",
+                  "value": "MH12AB3456",
+                  "type": "text"
+                },
+                {
+                  "key": "driver_name",
+                  "value": "Ramesh",
+                  "type": "text"
+                },
+                {
+                  "key": "start_location",
+                  "value": "Mumbai",
+                  "type": "text"
+                },
+                {
+                  "key": "end_location",
+                  "value": "Pune",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "value": "Scheduled",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/trips/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "trips",
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "LR Bilty",
+      "item": [
+        {
+          "name": "Get All LR",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/lr-bilty/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "lr-bilty",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add LR",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "lr_number",
+                  "value": "LR20250001",
+                  "type": "text"
+                },
+                {
+                  "key": "date",
+                  "value": "2025-01-18",
+                  "type": "text"
+                },
+                {
+                  "key": "consignor",
+                  "value": "ABC Ltd",
+                  "type": "text"
+                },
+                {
+                  "key": "consignee",
+                  "value": "XYZ Corp",
+                  "type": "text"
+                },
+                {
+                  "key": "route",
+                  "value": "Mumbai -> Pune",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/lr-bilty/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "lr-bilty",
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "EWay Bills",
+      "item": [
+        {
+          "name": "Get All EWay Bills",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/eway-bills/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "eway-bills",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add EWay Bill",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "invoice_number",
+                  "value": "INV-101",
+                  "type": "text"
+                },
+                {
+                  "key": "lr_number",
+                  "value": "LR20250001",
+                  "type": "text"
+                },
+                {
+                  "key": "supplier_name",
+                  "value": "ABC Electricals",
+                  "type": "text"
+                },
+                {
+                  "key": "buyer_name",
+                  "value": "KSR Traders",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/eway-bills/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "eway-bills",
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Finance Transactions",
+      "item": [
+        {
+          "name": "Get All Transactions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/finance-transactions/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "finance-transactions",
+                ""
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Transaction",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "date",
+                  "value": "2025-01-18",
+                  "type": "text"
+                },
+                {
+                  "key": "type",
+                  "value": "Income",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Trip payment",
+                  "type": "text"
+                },
+                {
+                  "key": "amount",
+                  "value": "45000",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "value": "Completed",
+                  "type": "text"
+                },
+                {
+                  "key": "category",
+                  "value": "Trip Payments",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/api/finance-transactions/",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "api",
+                "finance-transactions",
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vendors",
+      "item": [
+        {
+          "name": "Get All Vendors",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "http://127.0.0.1:8000/api/vendors/", "protocol": "http", "host": ["127","0","0","1"], "port": "8000", "path": ["api","vendors",""] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "Get All Inventory",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "http://127.0.0.1:8000/api/inventory/", "protocol": "http", "host": ["127","0","0","1"], "port": "8000", "path": ["api","inventory",""] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tracking",
+      "item": [
+        {
+          "name": "Get All Tracking",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "http://127.0.0.1:8000/api/tracking/", "protocol": "http", "host": ["127","0","0","1"], "port": "8000", "path": ["api","tracking",""] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "System Settings",
+      "item": [
+        {
+          "name": "Get All Settings",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "http://127.0.0.1:8000/api/settings/", "protocol": "http", "host": ["127","0","0","1"], "port": "8000", "path": ["api","settings",""] }
+          }
+        }
+      ]
+    }
+  ]
+}

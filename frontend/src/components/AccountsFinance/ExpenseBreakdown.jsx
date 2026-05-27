@@ -42,7 +42,7 @@ const ExpenseBreakdown = () => {
         </p>
       </div>
 
-      <ResponsiveContainer width="100%" height={250}>
+      <ResponsiveContainer width="100%" height={250} minHeight={1} minWidth={1}>
         <PieChart>
           <Pie
             data={data}

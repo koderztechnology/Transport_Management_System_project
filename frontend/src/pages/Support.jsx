@@ -31,7 +31,7 @@ export default function Support() {
         const parsed = JSON.parse(raw);
         setForm((prev) => ({ ...prev, ...parsed }));
       }
-    } catch (e) {
+    } catch {
       // ignore parse errors
     }
   }, []);
@@ -48,7 +48,7 @@ export default function Support() {
     const id = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(toSave));
-      } catch (e) {
+      } catch {
         // ignore quota errors
       }
     }, 600);

@@ -88,3 +88,5 @@ Thumbs.db
 .vscode/
 .idea/
 
+# MS Office temporary lock files
+~$*

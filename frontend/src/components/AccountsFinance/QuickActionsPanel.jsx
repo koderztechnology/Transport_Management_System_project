@@ -1,7 +1,6 @@
-import { useState } from 'react';
 
 const QuickActionsPanel = () => {
-  const [isExpanded, setIsExpanded] = useState(false);
+
 
   const actions = [
     {
