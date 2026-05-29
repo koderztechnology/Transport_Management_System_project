@@ -49,9 +49,9 @@ const EWayBillManagement = () => {
   const fetchRelatedData = async () => {
     try {
       const [vRes, dRes, lRes] = await Promise.all([
-        axios.get("http://127.0.0.1:8000/api/vehicles/"),
-        axios.get("http://127.0.0.1:8000/api/drivers/"),
-        axios.get("http://127.0.0.1:8000/api/lr-bilty/")
+        axios.get("https://transport.koderzgroup.com/api/vehicles/"),
+        axios.get("https://transport.koderzgroup.com/api/drivers/"),
+        axios.get("https://transport.koderzgroup.com/api/lr-bilty/")
       ]);
       setVehicles(vRes.data || []);
       setDrivers(dRes.data || []);
@@ -63,7 +63,7 @@ const EWayBillManagement = () => {
 
   const fetchEWayBills = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/eway-bills/');
+      const res = await axios.get('https://transport.koderzgroup.com/api/eway-bills/');
       const mapped = res.data.map(b => {
         const issueDate = b.added_date ? b.added_date.split('T')[0] : new Date().toISOString().split('T')[0];
         const issueTime = new Date(issueDate).getTime();
@@ -179,7 +179,7 @@ const EWayBillManagement = () => {
     };
 
     try {
-      await axios.post('http://127.0.0.1:8000/api/eway-bills/', payload);
+      await axios.post('https://transport.koderzgroup.com/api/eway-bills/', payload);
       fetchEWayBills();
       
       setFormData({
@@ -216,7 +216,7 @@ const EWayBillManagement = () => {
   const handleCancelBill = async (billId) => {
     if (window.confirm('Are you sure you want to cancel this E-Way Bill? This action cannot be undone.')) {
       try {
-        await axios.patch(`http://127.0.0.1:8000/api/eway-bills/${billId}/`, { status: 'Cancelled' });
+        await axios.patch(`https://transport.koderzgroup.com/api/eway-bills/${billId}/`, { status: 'Cancelled' });
         fetchEWayBills();
         alert('E-Way Bill cancelled successfully');
       } catch (err) {
@@ -230,7 +230,7 @@ const EWayBillManagement = () => {
     if (bill && bill.daysLeft < 1) {
       if (window.confirm(`Extend this E-Way Bill for 30 more days?`)) {
         try {
-          await axios.patch(`http://127.0.0.1:8000/api/eway-bills/${billId}/`, { status: 'Active', estimated_days: bill.validDays + 30 });
+          await axios.patch(`https://transport.koderzgroup.com/api/eway-bills/${billId}/`, { status: 'Active', estimated_days: bill.validDays + 30 });
           fetchEWayBills();
           alert('E-Way Bill extended successfully');
         } catch (err) {
