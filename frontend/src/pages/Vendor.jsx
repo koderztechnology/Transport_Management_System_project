@@ -28,7 +28,7 @@ export default function VendorManagement() {
 
   const fetchVendors = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/api/vendors/");
+      const response = await axios.get("https://transport.koderzgroup.com/api/vendors/");
       setVendors(response.data);
     } catch (error) {
       console.error("Error fetching vendors:", error);
@@ -89,12 +89,12 @@ export default function VendorManagement() {
 
     try {
       if (editVendorId) {
-        const res = await axios.put(`http://127.0.0.1:8000/api/vendors/${editVendorId}/`, payload);
+        const res = await axios.put(`https://transport.koderzgroup.com/api/vendors/${editVendorId}/`, payload);
         setVendors(
           vendors.map((v) => (v.vendor_id === editVendorId ? res.data : v))
         );
       } else {
-        const res = await axios.post("http://127.0.0.1:8000/api/vendors/", payload);
+        const res = await axios.post("https://transport.koderzgroup.com/api/vendors/", payload);
         setVendors([
           ...vendors,
           res.data,
@@ -125,7 +125,7 @@ export default function VendorManagement() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/vendors/${id}/`);
+      await axios.delete(`https://transport.koderzgroup.com/api/vendors/${id}/`);
       setVendors(vendors.filter((v) => v.vendor_id !== id));
       setShowDelete(null);
     } catch (error) {
@@ -138,7 +138,7 @@ export default function VendorManagement() {
     if(!vendor) return;
     const updatedStatus = vendor.status === "Active" ? "Inactive" : "Active";
     try {
-      const res = await axios.patch(`http://127.0.0.1:8000/api/vendors/${id}/`, { status: updatedStatus });
+      const res = await axios.patch(`https://transport.koderzgroup.com/api/vendors/${id}/`, { status: updatedStatus });
       setVendors(
         vendors.map((v) =>
           v.vendor_id === id ? res.data : v
