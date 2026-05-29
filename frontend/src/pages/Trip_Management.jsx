@@ -46,8 +46,8 @@ const TripManagement = () => {
   const fetchRelatedData = async () => {
     try {
       const [vRes, dRes] = await Promise.all([
-        axios.get("http://127.0.0.1:8000/api/vehicles/"),
-        axios.get("http://127.0.0.1:8000/api/drivers/")
+        axios.get("https://transport.koderzgroup.com/api/vehicles/"),
+        axios.get("https://transport.koderzgroup.com/api/drivers/")
       ]);
       setVehicles(vRes.data);
       setDrivers(dRes.data);
@@ -58,7 +58,7 @@ const TripManagement = () => {
 
   const fetchTrips = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:8000/api/trips/");
+      const res = await axios.get("https://transport.koderzgroup.com/api/trips/");
       const mappedTrips = res.data.map(t => ({
         id: t.trip_id,
         vehicleId: t.vehicle || "",
@@ -147,7 +147,7 @@ const TripManagement = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this trip?")) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/trips/${id}/`);
+        await axios.delete(`https://transport.koderzgroup.com/api/trips/${id}/`);
         fetchTrips();
       } catch (err) {
         console.error("Delete Error", err);
@@ -177,9 +177,9 @@ const TripManagement = () => {
       };
 
       if (isEditMode) {
-        await axios.put(`http://127.0.0.1:8000/api/trips/${currentTrip.id}/`, formattedPayload);
+        await axios.put(`https://transport.koderzgroup.com/api/trips/${currentTrip.id}/`, formattedPayload);
       } else {
-        await axios.post("http://127.0.0.1:8000/api/trips/", formattedPayload);
+        await axios.post("https://transport.koderzgroup.com/api/trips/", formattedPayload);
       }
       fetchTrips();
       setIsDrawerOpen(false);
