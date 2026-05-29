@@ -36,9 +36,9 @@ export default function LRManagement() {
   const fetchRelatedData = async () => {
     try {
       const [vRes, dRes, eRes] = await Promise.all([
-        axios.get("http://127.0.0.1:8000/api/vehicles/"),
-        axios.get("http://127.0.0.1:8000/api/drivers/"),
-        axios.get("http://127.0.0.1:8000/api/eway-bills/")
+        axios.get("https://transport.koderzgroup.com/api/vehicles/"),
+        axios.get("https://transport.koderzgroup.com/api/drivers/"),
+        axios.get("https://transport.koderzgroup.com/api/eway-bills/")
       ]);
       setVehicles(vRes.data || []);
       setDrivers(dRes.data || []);
@@ -50,7 +50,7 @@ export default function LRManagement() {
 
   const fetchLRs = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:8000/api/lr-bilty/");
+      const res = await axios.get("https://transport.koderzgroup.com/api/lr-bilty/");
       const mapped = res.data.map(item => ({
         id: item.lr_id,
         lrNumber: item.lr_number || "",
@@ -112,7 +112,7 @@ export default function LRManagement() {
         eway: newBill.eway || null,
         status: newBill.status === "in-transit" ? "In-Transit" : newBill.status.charAt(0).toUpperCase() + newBill.status.slice(1)
       };
-      await axios.post("http://127.0.0.1:8000/api/lr-bilty/", payload);
+      await axios.post("https://transport.koderzgroup.com/api/lr-bilty/", payload);
       fetchLRs();
       setShowCreate(false);
       setCurrentPage(1);
@@ -149,7 +149,7 @@ export default function LRManagement() {
         eway: updated.eway || null,
         status: updated.status === "in-transit" ? "In-Transit" : updated.status.charAt(0).toUpperCase() + updated.status.slice(1)
       };
-      await axios.put(`http://127.0.0.1:8000/api/lr-bilty/${updated.id}/`, payload);
+      await axios.put(`https://transport.koderzgroup.com/api/lr-bilty/${updated.id}/`, payload);
       fetchLRs();
       setShowEdit(false);
       setSelectedLR(null);
@@ -161,7 +161,7 @@ export default function LRManagement() {
   const handleDeleteConfirmed = async () => {
     if (!selectedLR) return;
     try {
-      await axios.delete(`http://127.0.0.1:8000/api/lr-bilty/${selectedLR.id}/`);
+      await axios.delete(`https://transport.koderzgroup.com/api/lr-bilty/${selectedLR.id}/`);
       fetchLRs();
       setShowDelete(false);
       setSelectedLR(null);
@@ -180,7 +180,7 @@ export default function LRManagement() {
     else nextStatus = "Pending";
 
     try {
-      await axios.patch(`http://127.0.0.1:8000/api/lr-bilty/${id}/`, { status: nextStatus });
+      await axios.patch(`https://transport.koderzgroup.com/api/lr-bilty/${id}/`, { status: nextStatus });
       fetchLRs();
       setMenuOpenFor(null);
     } catch(err) {
