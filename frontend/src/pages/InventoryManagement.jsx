@@ -18,8 +18,8 @@ const InventoryManagement = () => {
   const fetchData = async () => {
     try {
       const [invRes, venRes] = await Promise.all([
-        axios.get("http://127.0.0.1:8000/api/inventory/"),
-        axios.get("http://127.0.0.1:8000/api/vendors/")
+        axios.get("https://transport.koderzgroup.com/api/inventory/"),
+        axios.get("https://transport.koderzgroup.com/api/vendors/")
       ]);
       const mappedItems = invRes.data.map(item => ({
         id: item.item_id,
@@ -178,9 +178,9 @@ const InventoryManagement = () => {
 
     try {
       if (isEditMode) {
-        await axios.put(`http://127.0.0.1:8000/api/inventory/${editingItemId}/`, itemData);
+        await axios.put(`https://transport.koderzgroup.com/api/inventory/${editingItemId}/`, itemData);
       } else {
-        await axios.post("http://127.0.0.1:8000/api/inventory/", itemData);
+        await axios.post("https://transport.koderzgroup.com/api/inventory/", itemData);
       }
       fetchData();
       handleCloseModal();
@@ -199,7 +199,7 @@ const InventoryManagement = () => {
     );
     if (confirmed) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/inventory/${item.id}/`);
+        await axios.delete(`https://transport.koderzgroup.com/api/inventory/${item.id}/`);
         fetchData();
       } catch (err) {
         console.error(err);
