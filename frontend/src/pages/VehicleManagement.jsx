@@ -51,7 +51,7 @@ const VehicleManagement = () => {
 
   const fetchDrivers = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/drivers/');
+      const res = await axios.get('https://transport.koderzgroup.com/api/drivers/');
       setDrivers(res.data);
     } catch (err) {
       console.error("Error fetching drivers:", err);
@@ -60,7 +60,7 @@ const VehicleManagement = () => {
 
   const fetchVehicles = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/vehicles/');
+      const res = await axios.get('https://transport.koderzgroup.com/api/vehicles/');
       const apiVehicles = res.data.map(v => ({
         id: v.vehicle_id,
         vehicleNumber: v.vehicle_number || '',
@@ -154,7 +154,7 @@ const VehicleManagement = () => {
     };
 
     try {
-      await axios.post('http://127.0.0.1:8000/api/vehicles/', payload);
+      await axios.post('https://transport.koderzgroup.com/api/vehicles/', payload);
       fetchVehicles();
       
       setFormData({
@@ -196,7 +196,7 @@ const VehicleManagement = () => {
   const handleDeleteVehicle = async (vehicleId) => {
     if (window.confirm('Are you sure you want to delete this vehicle? This action cannot be undone.')) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/vehicles/${vehicleId}/`);
+        await axios.delete(`https://transport.koderzgroup.com/api/vehicles/${vehicleId}/`);
         fetchVehicles();
         alert('Vehicle deleted successfully');
       } catch (err) {
@@ -208,7 +208,7 @@ const VehicleManagement = () => {
 
   const handleUpdateStatus = async (vehicleId, newStatus) => {
     try {
-      await axios.patch(`http://127.0.0.1:8000/api/vehicles/${vehicleId}/`, { status: newStatus });
+      await axios.patch(`https://transport.koderzgroup.com/api/vehicles/${vehicleId}/`, { status: newStatus });
       fetchVehicles();
       alert(`Vehicle status updated to ${newStatus}`);
     } catch (err) {
