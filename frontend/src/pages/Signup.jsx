@@ -13,7 +13,7 @@ const Signup = () => {
   const handleSignup = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8000/api/signup/', {
+      const response = await axios.post('http://transport.koderzgroup.com/api/signup/', {
         username,
         email,
         password,
