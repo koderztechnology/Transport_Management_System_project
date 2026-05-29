@@ -21,9 +21,9 @@ const AccountsFinance = () => {
   const fetchRelatedData = async () => {
     try {
       const [vRes, tRes, venRes] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/api/vehicles/'),
-        axios.get('http://127.0.0.1:8000/api/trips/'),
-        axios.get('http://127.0.0.1:8000/api/vendors/')
+        axios.get('https://transport.koderzgroup.com/api/vehicles/'),
+        axios.get('https://transport.koderzgroup.com/api/trips/'),
+        axios.get('https://transport.koderzgroup.com/api/vendors/')
       ]);
       setVehicles(vRes.data);
       setTrips(tRes.data);
@@ -35,7 +35,7 @@ const AccountsFinance = () => {
 
   const fetchTransactions = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/finance-transactions/');
+      const res = await axios.get('https://transport.koderzgroup.com/api/finance-transactions/');
       const mapped = res.data.map(t => ({
         id: t.transaction_id,
         date: t.date || '',
@@ -316,10 +316,10 @@ const AccountsFinance = () => {
     try {
       if (isEditMode) {
         // UPDATE existing transaction
-        await axios.put(`http://127.0.0.1:8000/api/finance-transactions/${editingTransactionId}/`, payload);
+        await axios.put(`https://transport.koderzgroup.com/api/finance-transactions/${editingTransactionId}/`, payload);
       } else {
         // ADD new transaction
-        await axios.post('http://127.0.0.1:8000/api/finance-transactions/', payload);
+        await axios.post('https://transport.koderzgroup.com/api/finance-transactions/', payload);
       }
       fetchTransactions();
       handleCloseModal();
