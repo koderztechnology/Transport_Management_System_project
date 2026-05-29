@@ -16,7 +16,7 @@ import {
 import { motion } from "framer-motion";
 import axios from "axios";
 
-const BASE_URL = "http://127.0.0.1:8000/api";
+const BASE_URL = "https://transport.koderzgroup.com/api";
 const FUEL_API_URL = `${BASE_URL}/fuel/`;
 const TOLL_API_URL = `${BASE_URL}/toll/`;
 
@@ -62,7 +62,7 @@ export default function TransportFuelTollPage() {
         const [fuelRes, tollRes, vehicleRes] = await Promise.all([
           axios.get(FUEL_API_URL),
           axios.get(TOLL_API_URL),
-          axios.get('http://127.0.0.1:8000/api/vehicles/'),
+          axios.get('https://transport.koderzgroup.com/api/vehicles/'),
         ]);
 
         setFuelData(fuelRes.data || []);
@@ -163,7 +163,7 @@ export default function TransportFuelTollPage() {
     if (typeof photo === "string") {
       // backend will return something like "/media/..."
       if (photo.startsWith("http")) return photo;
-      return `http://127.0.0.1:8000${photo}`;
+      return `https://transport.koderzgroup.com${photo}`;
     }
     return URL.createObjectURL(photo);
   };
