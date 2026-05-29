@@ -13,7 +13,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const response = await axios.get(`http://127.0.0.1:8000/api/dashboard/?username=${username}&role=${userRole}`);
+        const response = await axios.get(`https://transport.koderzgroup.com/api/dashboard/?username=${username}&role=${userRole}`);
         setDashboardData(response.data);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
