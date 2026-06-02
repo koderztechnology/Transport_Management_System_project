@@ -399,21 +399,37 @@ export default function LRManagement() {
             <span className="font-medium">{Math.min(indexOfLast, lrData.length)}</span> of{" "}
             <span className="font-medium">{lrData.length}</span> results
           </p>
-          <div className="flex gap-2">
-            {Array.from({ length: totalPages }, (_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentPage(index + 1)}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                  currentPage === index + 1
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {index + 1}
-              </button>
-            ))}
-          </div>
+         <div className="flex items-center gap-3">
+
+           <button
+             onClick={() => setCurrentPage(currentPage - 1)}
+             disabled={currentPage === 1}
+             className={`px-4 py-2 rounded-lg border ${
+               currentPage === 1
+                 ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                 : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Previous
+          </button>
+
+          <span className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium">
+            {currentPage}
+          </span>
+
+          <button
+            onClick={() => setCurrentPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-2 rounded-lg border ${
+              currentPage === totalPages
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Next
+          </button>
+
+        </div>
         </div>
       </div>
 
