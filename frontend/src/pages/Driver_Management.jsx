@@ -236,22 +236,36 @@ const DriverManagement = () => {
       </div>
 
       {/* PAGINATION */}
-      <div className="flex justify-center mt-6 gap-2">
-        {[...Array(totalPages)].map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setCurrentPage(i + 1)}
-            className={`px-4 py-2 rounded-lg border ${
-              currentPage === i + 1
-                ? "bg-indigo-600 text-white"
-                : "bg-white text-slate-600"
-            }`}
-          >
-            {i + 1}
-          </button>
-        ))}
-      </div>
+      <div className="flex justify-center items-center gap-4 mt-6">
+        <button
+          onClick={() => setCurrentPage(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={`px-4 py-2 rounded-lg border ${
+            currentPage === 1
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-white text-slate-600 hover:bg-slate-50"
+           }`}
+         >
+           Previous
+         </button>
 
+         <span className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium">
+           {currentPage}
+         </span>
+
+         <button
+           onClick={() => setCurrentPage(currentPage + 1)}
+           disabled={currentPage === totalPages}
+           className={`px-4 py-2 rounded-lg border ${
+             currentPage === totalPages
+               ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+               : "bg-white text-slate-600 hover:bg-slate-50"
+           }`}
+         >
+           Next
+         </button>
+
+       </div>
       {/* ADD MODAL */}
       {showAddModal && (
         <Modal
