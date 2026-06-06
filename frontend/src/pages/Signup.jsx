@@ -23,7 +23,14 @@ const Signup = () => {
         navigate('/login');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Signup failed. Try a different username.');
+      console.log("FULL ERROR:", err.response);
+      console.log("STATUS:", err.response?.status);
+      console.log("DATA:", err.response?.data);
+
+      setError(
+        JSON.stringify(err.response?.data) ||
+        "Signup failed"
+      );
     }
   };
 
