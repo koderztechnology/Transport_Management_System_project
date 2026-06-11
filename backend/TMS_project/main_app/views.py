@@ -252,8 +252,10 @@ from rest_framework.decorators import permission_classes
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
+from django.views.decorators.csrf import csrf_exempt
 from .models import UserProfile
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def admin_signup(request):
