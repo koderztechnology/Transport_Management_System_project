@@ -1,7 +1,5 @@
 
 const QuickActionsPanel = () => {
-
-
   const actions = [
     {
       id: 1,

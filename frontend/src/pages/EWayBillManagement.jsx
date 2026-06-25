@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 const EWayBillManagement = () => {
   // ============================================================
@@ -49,9 +49,9 @@ const EWayBillManagement = () => {
   const fetchRelatedData = async () => {
     try {
       const [vRes, dRes, lRes] = await Promise.all([
-        axios.get("https://transport.koderzgroup.com/api/vehicles/"),
-        axios.get("https://transport.koderzgroup.com/api/drivers/"),
-        axios.get("https://transport.koderzgroup.com/api/lr-bilty/")
+        api.get("/vehicles/"),
+        api.get("/drivers/"),
+        api.get("/lr-bilty/")
       ]);
       setVehicles(vRes.data || []);
       setDrivers(dRes.data || []);
@@ -63,7 +63,7 @@ const EWayBillManagement = () => {
 
   const fetchEWayBills = async () => {
     try {
-      const res = await axios.get('https://transport.koderzgroup.com/api/eway-bills/');
+      const res = await api.get('/eway-bills/');
       const mapped = res.data.map(b => {
         const issueDate = b.added_date ? b.added_date.split('T')[0] : new Date().toISOString().split('T')[0];
         const issueTime = new Date(issueDate).getTime();
@@ -119,20 +119,36 @@ const EWayBillManagement = () => {
   // ============================================================
   const validateForm = () => {
     const errors = {};
+    const invoiceAmountValue = Number(formData.invoiceAmount);
+    const estimatedDaysValue = Number(formData.estimatedDays);
+    const gstinPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
     if (!formData.invoiceNumber.trim()) errors.invoiceNumber = 'Invoice number is required';
     if (!String(formData.lrNumber).trim()) errors.lrNumber = 'LR number is required';
     if (!formData.supplierName.trim()) errors.supplierName = 'Supplier name is required';
-    if (!formData.supplierGSTIN.trim()) errors.supplierGSTIN = 'Supplier GSTIN is required';
+    if (!formData.supplierGSTIN.trim()) {
+      errors.supplierGSTIN = 'Supplier GSTIN is required';
+    } else if (!gstinPattern.test(formData.supplierGSTIN.trim().toUpperCase())) {
+      errors.supplierGSTIN = 'Enter a valid GSTIN';
+    }
     if (!formData.buyerName.trim()) errors.buyerName = 'Buyer name is required';
-    if (!formData.buyerGSTIN.trim()) errors.buyerGSTIN = 'Buyer GSTIN is required';
+    if (!formData.buyerGSTIN.trim()) {
+      errors.buyerGSTIN = 'Buyer GSTIN is required';
+    } else if (!gstinPattern.test(formData.buyerGSTIN.trim().toUpperCase())) {
+      errors.buyerGSTIN = 'Enter a valid GSTIN';
+    }
     if (!formData.goodsDescription.trim()) errors.goodsDescription = 'Goods description is required';
     if (!formData.hsn_code.trim()) errors.hsn_code = 'HSN code is required';
-    if (!formData.invoiceAmount.trim()) errors.invoiceAmount = 'Invoice amount is required';
+    if (!formData.invoiceAmount.trim() || !Number.isFinite(invoiceAmountValue) || invoiceAmountValue <= 0) {
+      errors.invoiceAmount = 'Invoice amount must be a positive number';
+    }
     if (!String(formData.vehicleNumber).trim()) errors.vehicleNumber = 'Vehicle number is required';
     if (!formData.routeFrom.trim()) errors.routeFrom = 'Route From is required';
     if (!formData.routeTo.trim()) errors.routeTo = 'Route To is required';
     if (!String(formData.driverName).trim()) errors.driverName = 'Driver name is required';
+    if (formData.estimatedDays && (!Number.isFinite(estimatedDaysValue) || estimatedDaysValue <= 0 || !Number.isInteger(estimatedDaysValue))) {
+      errors.estimatedDays = 'Estimated days must be a whole number greater than 0';
+    }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -179,7 +195,7 @@ const EWayBillManagement = () => {
     };
 
     try {
-      await axios.post('https://transport.koderzgroup.com/api/eway-bills/', payload);
+      await api.post('/eway-bills/', payload);
       fetchEWayBills();
       
       setFormData({
@@ -216,7 +232,7 @@ const EWayBillManagement = () => {
   const handleCancelBill = async (billId) => {
     if (window.confirm('Are you sure you want to cancel this E-Way Bill? This action cannot be undone.')) {
       try {
-        await axios.patch(`https://transport.koderzgroup.com/api/eway-bills/${billId}/`, { status: 'Cancelled' });
+        await api.patch(`/eway-bills/${billId}/`, { status: 'Cancelled' });
         fetchEWayBills();
         alert('E-Way Bill cancelled successfully');
       } catch (err) {
@@ -230,7 +246,7 @@ const EWayBillManagement = () => {
     if (bill && bill.daysLeft < 1) {
       if (window.confirm(`Extend this E-Way Bill for 30 more days?`)) {
         try {
-          await axios.patch(`https://transport.koderzgroup.com/api/eway-bills/${billId}/`, { status: 'Active', estimated_days: bill.validDays + 30 });
+          await api.patch(`/eway-bills/${billId}/`, { status: 'Active', estimated_days: bill.validDays + 30 });
           fetchEWayBills();
           alert('E-Way Bill extended successfully');
         } catch (err) {
@@ -248,15 +264,29 @@ const EWayBillManagement = () => {
     alert(`Downloading PDF for E-Way Bill: ${bill.ewaybillNumber}`);
   };
 
+  const getVehicleNumber = (vId) => {
+    const found = vehicles.find(v => String(v.vehicle_id) === String(vId));
+    return found ? found.vehicle_number : `Vehicle ${vId}`;
+  };
+
+  const getDriverName = (dId) => {
+    const found = drivers.find(d => String(d.driver_id) === String(dId));
+    return found ? found.name : `Driver ${dId}`;
+  };
+
   // ============================================================
   // FILTERING LOGIC
   // ============================================================
   const filteredBills = ewayBills.filter(bill => {
+    const vNum = getVehicleNumber(bill.vehicle);
+    const dName = getDriverName(bill.driver);
     const matchesSearch = 
       String(bill.ewaybillNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(bill.invoiceNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(bill.supplier || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(bill.buyer || "").toLowerCase().includes(searchQuery.toLowerCase());
+      String(bill.buyer || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(vNum).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(dName).toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = filterStatus === 'all' || bill.status === filterStatus;
 
@@ -376,7 +406,7 @@ const EWayBillManagement = () => {
                       name="lrNumber"
                       value={formData.lrNumber}
                       onChange={handleFormChange}
-                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
+                      className={`w-full pl-4 pr-10 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
                         formErrors.lrNumber ? 'border-red-500' : 'border-slate-300'
                       }`}
                     >
@@ -523,7 +553,7 @@ const EWayBillManagement = () => {
                       name="vehicleNumber"
                       value={formData.vehicleNumber}
                       onChange={handleFormChange}
-                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
+                      className={`w-full pl-4 pr-10 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
                         formErrors.vehicleNumber ? 'border-red-500' : 'border-slate-300'
                       }`}
                     >
@@ -589,7 +619,7 @@ const EWayBillManagement = () => {
                       name="driverName"
                       value={formData.driverName}
                       onChange={handleFormChange}
-                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
+                      className={`w-full pl-4 pr-10 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary bg-white ${
                         formErrors.driverName ? 'border-red-500' : 'border-slate-300'
                       }`}
                     >
@@ -850,7 +880,7 @@ const EWayBillManagement = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+            className="pl-4 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary bg-white"
           >
             <option value="all">All Status</option>
             <option value="Active">Active</option>

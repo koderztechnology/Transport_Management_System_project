@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import { useLocation } from "react-router-dom";
+import api from "../utils/api";
 import {
   Bar,
   BarChart,
@@ -30,6 +31,7 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 const TripManagement = () => {
+  const location = useLocation();
   // ---------------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------------
@@ -43,11 +45,37 @@ const TripManagement = () => {
     fetchRelatedData();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get("search");
+    if (q) {
+      setSearchTerm(q);
+    }
+    const action = params.get("action");
+    if (action === "add") {
+      setIsDrawerOpen(true);
+      setIsEditMode(false);
+      setCurrentTrip({
+        id: null,
+        vehicleId: "",
+        driverName: "",
+        startLocation: "",
+        endLocation: "",
+        startTime: "",
+        endTime: "",
+        status: "Scheduled",
+        distance: 0,
+        fuelConsumed: 0,
+      });
+      setFormErrors({});
+    }
+  }, [location.search]);
+
   const fetchRelatedData = async () => {
     try {
       const [vRes, dRes] = await Promise.all([
-        axios.get("https://transport.koderzgroup.com/api/vehicles/"),
-        axios.get("https://transport.koderzgroup.com/api/drivers/")
+        api.get("/vehicles/"),
+        api.get("/drivers/")
       ]);
       setVehicles(vRes.data);
       setDrivers(dRes.data);
@@ -58,7 +86,7 @@ const TripManagement = () => {
 
   const fetchTrips = async () => {
     try {
-      const res = await axios.get("https://transport.koderzgroup.com/api/trips/");
+      const res = await api.get("/trips/");
       const mappedTrips = res.data.map(t => ({
         id: t.trip_id,
         vehicleId: t.vehicle || "",
@@ -84,6 +112,17 @@ const TripManagement = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [locationSuggestions, setLocationSuggestions] = useState([]);
   const [activeLocationField, setActiveLocationField] = useState(null); // 'start' or 'end'
+  const [formErrors, setFormErrors] = useState({});
+
+  const getVehicleNumber = (vId) => {
+    const found = vehicles.find(v => String(v.vehicle_id) === String(vId));
+    return found ? found.vehicle_number : (vId ? `Vehicle ${vId}` : 'Unassigned');
+  };
+
+  const getDriverName = (dId) => {
+    const found = drivers.find(d => String(d.driver_id) === String(dId));
+    return found ? found.name : (dId ? `Driver ${dId}` : 'Unassigned');
+  };
 
   // ---------------------------------------------------------------------------
   // Derived Data
@@ -91,15 +130,15 @@ const TripManagement = () => {
   const filteredTrips = useMemo(() => {
     return trips.filter((trip) => {
       const matchesSearch =
-        String(trip.vehicleId).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(trip.driverName).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(getVehicleNumber(trip.vehicleId)).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(getDriverName(trip.driverName)).toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(trip.startLocation).toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(trip.endLocation).toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus =
         statusFilter === "All" || trip.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [trips, searchTerm, statusFilter]);
+  }, [trips, vehicles, drivers, searchTerm, statusFilter]);
 
   const stats = useMemo(() => {
     const totalTrips = trips.length;
@@ -121,7 +160,38 @@ const TripManagement = () => {
   // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------
+  const validateTripForm = () => {
+    const errors = {};
+    if (!String(currentTrip?.vehicleId || "").trim()) {
+      errors.vehicleId = "Please select a vehicle.";
+    }
+    if (!String(currentTrip?.driverName || "").trim()) {
+      errors.driverName = "Please select a driver.";
+    }
+    if (!String(currentTrip?.startLocation || "").trim()) {
+      errors.startLocation = "Start location is required.";
+    }
+    if (!String(currentTrip?.endLocation || "").trim()) {
+      errors.endLocation = "End location is required.";
+    }
+    if (!currentTrip?.startTime) {
+      errors.startTime = "Start time is required.";
+    }
+    if (!currentTrip?.endTime) {
+      errors.endTime = "End time is required.";
+    }
+    if (currentTrip?.startTime && currentTrip?.endTime) {
+      const start = new Date(currentTrip.startTime);
+      const end = new Date(currentTrip.endTime);
+      if (end < start) {
+        errors.endTime = "End time cannot be earlier than the start time.";
+      }
+    }
+    return errors;
+  };
+
   const handleAddNew = () => {
+    setFormErrors({});
     setCurrentTrip({
       id: null,
       vehicleId: "",
@@ -141,13 +211,14 @@ const TripManagement = () => {
   const handleEdit = (trip) => {
     setCurrentTrip({ ...trip });
     setIsEditMode(true);
+    setFormErrors({});
     setIsDrawerOpen(true);
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this trip?")) {
       try {
-        await axios.delete(`https://transport.koderzgroup.com/api/trips/${id}/`);
+        await api.delete(`/trips/${id}/`);
         fetchTrips();
       } catch (err) {
         console.error("Delete Error", err);
@@ -157,6 +228,13 @@ const TripManagement = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    const validationErrors = validateTripForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors);
+      return;
+    }
+    setFormErrors({});
+
     const payload = {
       vehicle: currentTrip.vehicleId || null,
       driver: currentTrip.driverName || null,
@@ -177,9 +255,9 @@ const TripManagement = () => {
       };
 
       if (isEditMode) {
-        await axios.put(`https://transport.koderzgroup.com/api/trips/${currentTrip.id}/`, formattedPayload);
+        await api.put(`/trips/${currentTrip.id}/`, formattedPayload);
       } else {
-        await axios.post("https://transport.koderzgroup.com/api/trips/", formattedPayload);
+        await api.post("/trips/", formattedPayload);
       }
       fetchTrips();
       setIsDrawerOpen(false);
@@ -399,7 +477,7 @@ const TripManagement = () => {
               />
             </div>
             <select
-              className="select select-bordered w-full sm:w-48 px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+              className="select select-bordered w-full sm:w-48 pl-4 pr-10 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -432,10 +510,10 @@ const TripManagement = () => {
                       >
                         <td className="p-4">
                           <div className="font-medium text-slate-900">
-                            {trip.vehicleId}
+                            {getVehicleNumber(trip.vehicleId)}
                           </div>
                           <div className="text-sm text-slate-500">
-                            {trip.driverName}
+                            {getDriverName(trip.driverName)}
                           </div>
                         </td>
                         <td className="p-4">
@@ -617,10 +695,10 @@ const TripManagement = () => {
                     <Marker key={trip.id} position={[20.5937, 78.9629]}>
                       <Popup>
                         <div className="text-xs font-medium">
-                          {trip.vehicleId}
+                          {getVehicleNumber(trip.vehicleId)}
                         </div>
                         <div className="text-xs text-slate-500">
-                          {trip.driverName}
+                          {getDriverName(trip.driverName)}
                         </div>
                       </Popup>
                     </Marker>
@@ -643,7 +721,7 @@ const TripManagement = () => {
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                  className="w-full pl-4 pr-10 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
                   value={currentTrip.vehicleId}
                   onChange={(e) =>
                     setCurrentTrip({
@@ -659,6 +737,9 @@ const TripManagement = () => {
                     </option>
                   ))}
                 </select>
+                {formErrors.vehicleId && (
+                  <p className="mt-1 text-xs text-red-600">{formErrors.vehicleId}</p>
+                )}
               </div>
 
               <div>
@@ -667,7 +748,7 @@ const TripManagement = () => {
                 </label>
                 <select
                   required
-                  className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                  className="w-full pl-4 pr-10 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
                   value={currentTrip.driverName}
                   onChange={(e) =>
                     setCurrentTrip({
@@ -683,6 +764,9 @@ const TripManagement = () => {
                     </option>
                   ))}
                 </select>
+                {formErrors.driverName && (
+                  <p className="mt-1 text-xs text-red-600">{formErrors.driverName}</p>
+                )}
               </div>
 
               {/* Start Location */}
@@ -703,6 +787,9 @@ const TripManagement = () => {
                     handleLocationSearch(e.target.value, "start");
                   }}
                 />
+                {formErrors.startLocation && (
+                  <p className="mt-1 text-xs text-red-600">{formErrors.startLocation}</p>
+                )}
               </div>
 
               {/* End Location */}
@@ -723,6 +810,9 @@ const TripManagement = () => {
                     handleLocationSearch(e.target.value, "end");
                   }}
                 />
+                {formErrors.endLocation && (
+                  <p className="mt-1 text-xs text-red-600">{formErrors.endLocation}</p>
+                )}
                 {activeLocationField === "end" &&
                   locationSuggestions.length > 0 && (
                     <ul className="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
@@ -742,7 +832,7 @@ const TripManagement = () => {
               </div>
 
               {/* Times */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Start Time
@@ -758,6 +848,9 @@ const TripManagement = () => {
                       })
                     }
                   />
+                  {formErrors.startTime && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.startTime}</p>
+                  )}
                 </div>
 
                 <div>
@@ -775,6 +868,9 @@ const TripManagement = () => {
                       })
                     }
                   />
+                  {formErrors.endTime && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.endTime}</p>
+                  )}
                 </div>
               </div>
 
@@ -784,7 +880,7 @@ const TripManagement = () => {
                   Status
                 </label>
                 <select
-                  className="w-full px-4 py-2 rounded-lg border"
+                  className="w-full pl-4 pr-10 py-2 rounded-lg border"
                   value={currentTrip.status}
                   onChange={(e) =>
                     setCurrentTrip({ ...currentTrip, status: e.target.value })

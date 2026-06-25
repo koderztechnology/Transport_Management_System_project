@@ -1,8 +1,10 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,7 +15,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const response = await axios.get(`https://transport.koderzgroup.com/api/dashboard/?username=${username}&role=${userRole}`);
+        const response = await api.get(`/dashboard/?username=${username}&role=${userRole}`);
         setDashboardData(response.data);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -27,8 +29,7 @@ const Dashboard = () => {
   // Top Summary Cards (KPIs)
   const kpiCards = dashboardData?.kpiCards || [];
 
-  // Vehicle Alerts
-  const vehicleAlerts = dashboardData?.vehicleAlerts || [];
+
 
   // Trip Status Data
   const tripStatusData = dashboardData?.tripStatusData || [];
@@ -47,8 +48,7 @@ const Dashboard = () => {
   // Activity Log
   const activityLog = dashboardData?.activityLog || [];
 
-  // Notifications
-  const notifications = dashboardData?.notifications || [];
+
 
 
 
@@ -83,13 +83,6 @@ const Dashboard = () => {
           <p className="text-slate-500 text-sm mt-1">
             Monitor your transportation management system
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-slate-400 text-sm">Last updated: 2 mins ago</span>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
-            <span className="material-symbols-outlined text-[18px]">refresh</span>
-            Refresh
-          </button>
         </div>
       </div>
 
@@ -127,54 +120,7 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Vehicle Alerts Panel */}
-      {userRole !== 'Vendor' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-orange-500">warning</span>
-              Vehicle Alerts
-            </h3>
-            <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">View All Alerts</button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {vehicleAlerts.map((alert, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg border-l-4 ${
-                  alert.severity === 'critical'
-                    ? 'bg-red-50 border-red-500'
-                    : alert.severity === 'high'
-                    ? 'bg-orange-50 border-orange-500'
-                    : 'bg-yellow-50 border-yellow-500'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <span
-                    className={`material-symbols-outlined text-xl ${
-                      alert.severity === 'critical'
-                        ? 'text-red-600'
-                        : alert.severity === 'high'
-                        ? 'text-orange-600'
-                        : 'text-yellow-600'
-                    }`}
-                  >
-                    {alert.icon}
-                  </span>
-                  <div className="flex-1">
-                    <p className="font-medium text-slate-900 text-sm">{alert.type}</p>
-                    <p className="text-xs text-slate-600 mt-1">{alert.vehicle}</p>
-                    <p className="text-xs font-semibold text-slate-700 mt-2">
-                      {alert.daysLeft} days left
-                    </p>
-                    <button className="text-xs text-primary hover:underline mt-2">View Details →</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {/* Trip Status Section */}
       {userRole !== 'Vendor' && (
@@ -248,7 +194,7 @@ const Dashboard = () => {
             <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Recent Trips</h3>
-              <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">View All</button>
+              <button onClick={() => navigate('/trip-management')} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">View All</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -478,19 +424,19 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h3>
             <div className="space-y-3">
-              <button className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+              <button onClick={() => navigate('/trip-management?action=add')} className="w-full flex items-center gap-3 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">add_circle</span>
                 <span className="font-medium">Add Trip</span>
               </button>
-              <button className="w-full flex items-center gap-3 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
+              <button onClick={() => navigate('/lr-management?action=add')} className="w-full flex items-center gap-3 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">receipt_long</span>
                 <span className="font-medium">Create LR</span>
               </button>
-              <button className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors">
+              <button onClick={() => navigate('/accounts-finance?action=addExpense')} className="w-full flex items-center gap-3 px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">payments</span>
                 <span className="font-medium">Add Expense</span>
               </button>
-              <button className="w-full flex items-center gap-3 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
+              <button onClick={() => navigate('/accounts-finance?action=addIncome')} className="w-full flex items-center gap-3 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">description</span>
                 <span className="font-medium">Generate Invoice</span>
               </button>
@@ -499,54 +445,22 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Activity Log & Notifications */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Activity Log */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-slate-900">Activity Log</h3>
-            <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">View All</button>
-          </div>
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {activityLog.map((activity, index) => (
-              <div key={index} className="flex gap-3">
-                <span className={`material-symbols-outlined ${activity.iconColor} mt-1`}>{activity.icon}</span>
-                <div className="flex-1">
-                  <p className="text-sm text-slate-700">{activity.message}</p>
-                  <p className="text-xs text-slate-500 mt-1">{activity.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Activity Log */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-slate-900">Activity Log</h3>
+          <button onClick={() => navigate('/tracking-analytics')} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer">View All</button>
         </div>
-
-        {/* Alerts & Notifications */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-red-500">notifications</span>
-              Notifications
-            </h3>
-            <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">Mark All Read</button>
-          </div>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {notifications.map((notification, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg border-l-4 ${
-                  notification.severity === 'high'
-                    ? 'bg-red-50 border-red-500'
-                    : notification.severity === 'medium'
-                    ? 'bg-yellow-50 border-yellow-500'
-                    : 'bg-blue-50 border-blue-500'
-                }`}
-              >
-                <p className="font-medium text-sm text-slate-900">{notification.title}</p>
-                <p className="text-xs text-slate-600 mt-1">{notification.message}</p>
-                <p className="text-xs text-slate-500 mt-2">{notification.time}</p>
+        <div className="space-y-4 max-h-96 overflow-y-auto">
+          {activityLog.map((activity, index) => (
+            <div key={index} className="flex gap-3">
+              <span className={`material-symbols-outlined ${activity.iconColor} mt-1`}>{activity.icon}</span>
+              <div className="flex-1">
+                <p className="text-sm text-slate-700">{activity.message}</p>
+                <p className="text-xs text-slate-500 mt-1">{activity.time}</p>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </main>

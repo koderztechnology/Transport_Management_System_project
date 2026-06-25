@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useLocation } from 'react-router-dom';
+import api from '../utils/api';
 
 const VehicleManagement = () => {
+  const location = useLocation();
   // ============================================================
   // STATE MANAGEMENT
   // ============================================================
@@ -9,6 +11,15 @@ const VehicleManagement = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get("search");
+    if (q) {
+      setSearchQuery(q);
+    }
+  }, [location.search]);
+
   const [filterStatus, setFilterStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -51,7 +62,7 @@ const VehicleManagement = () => {
 
   const fetchDrivers = async () => {
     try {
-      const res = await axios.get('https://transport.koderzgroup.com/api/drivers/');
+      const res = await api.get('/drivers/');
       setDrivers(res.data);
     } catch (err) {
       console.error("Error fetching drivers:", err);
@@ -60,7 +71,7 @@ const VehicleManagement = () => {
 
   const fetchVehicles = async () => {
     try {
-      const res = await axios.get('https://transport.koderzgroup.com/api/vehicles/');
+      const res = await api.get('/vehicles/');
       const apiVehicles = res.data.map(v => ({
         id: v.vehicle_id,
         vehicleNumber: v.vehicle_number || '',
@@ -109,15 +120,27 @@ const VehicleManagement = () => {
   // ============================================================
   const validateForm = () => {
     const errors = {};
+    const currentYear = new Date().getFullYear();
+    const manufacturingYear = Number(formData.manufacturingYear);
+    const capacityValue = Number(formData.capacity);
+    const gvwrValue = Number(formData.gvwr);
 
     if (!formData.vehicleNumber.trim()) errors.vehicleNumber = 'Vehicle number is required';
     if (!formData.ownerName.trim()) errors.ownerName = 'Owner name is required';
     if (!formData.modelName.trim()) errors.modelName = 'Model name is required';
-    if (!formData.manufacturingYear) errors.manufacturingYear = 'Manufacturing year is required';
+    if (!formData.manufacturingYear) {
+      errors.manufacturingYear = 'Manufacturing year is required';
+    } else if (!Number.isInteger(manufacturingYear) || manufacturingYear < 1950 || manufacturingYear > currentYear + 1) {
+      errors.manufacturingYear = 'Enter a valid manufacturing year';
+    }
     if (!formData.chassisNumber.trim()) errors.chassisNumber = 'Chassis number is required';
     if (!formData.engineNumber.trim()) errors.engineNumber = 'Engine number is required';
-    if (!formData.capacity.trim()) errors.capacity = 'Capacity is required';
-    if (!formData.gvwr.trim()) errors.gvwr = 'GVWR is required';
+    if (!formData.capacity.trim() || !Number.isFinite(capacityValue) || capacityValue <= 0) {
+      errors.capacity = 'Capacity must be a positive number';
+    }
+    if (!formData.gvwr.trim() || !Number.isFinite(gvwrValue) || gvwrValue <= 0) {
+      errors.gvwr = 'GVWR must be a positive number';
+    }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -154,7 +177,7 @@ const VehicleManagement = () => {
     };
 
     try {
-      await axios.post('https://transport.koderzgroup.com/api/vehicles/', payload);
+      await api.post('/vehicles/', payload);
       fetchVehicles();
       
       setFormData({
@@ -196,7 +219,7 @@ const VehicleManagement = () => {
   const handleDeleteVehicle = async (vehicleId) => {
     if (window.confirm('Are you sure you want to delete this vehicle? This action cannot be undone.')) {
       try {
-        await axios.delete(`https://transport.koderzgroup.com/api/vehicles/${vehicleId}/`);
+        await api.delete(`/vehicles/${vehicleId}/`);
         fetchVehicles();
         alert('Vehicle deleted successfully');
       } catch (err) {
@@ -208,13 +231,18 @@ const VehicleManagement = () => {
 
   const handleUpdateStatus = async (vehicleId, newStatus) => {
     try {
-      await axios.patch(`https://transport.koderzgroup.com/api/vehicles/${vehicleId}/`, { status: newStatus });
+      await api.patch(`/vehicles/${vehicleId}/`, { status: newStatus });
       fetchVehicles();
       alert(`Vehicle status updated to ${newStatus}`);
     } catch (err) {
       console.error(err);
       alert('Error updating status');
     }
+  };
+
+  const getDriverName = (driverId) => {
+    const found = drivers.find(d => String(d.driver_id) === String(driverId));
+    return found ? found.name : (driverId ? `Driver ${driverId}` : 'Unassigned');
   };
 
   // ============================================================
@@ -224,7 +252,7 @@ const VehicleManagement = () => {
     const matchesSearch = 
       String(vehicle.vehicleNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(vehicle.model || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(vehicle.owner || "").toLowerCase().includes(searchQuery.toLowerCase());
+      String(getDriverName(vehicle.owner)).toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = filterStatus === 'all' || vehicle.status === filterStatus;
 
@@ -377,7 +405,7 @@ const VehicleManagement = () => {
                       name="vehicleType"
                       value={formData.vehicleType}
                       onChange={handleFormChange}
-                      className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full pl-4 pr-10 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option>Truck</option>
                       <option>Tempo</option>
@@ -414,7 +442,7 @@ const VehicleManagement = () => {
                       name="ownerName"
                       value={formData.ownerName}
                       onChange={handleFormChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
+                      className={`w-full pl-4 pr-10 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
                         formErrors.ownerName ? 'border-red-500' : 'border-slate-200'
                       }`}
                     >
@@ -698,7 +726,7 @@ const VehicleManagement = () => {
                   </div>
                   <div className="bg-slate-50 p-4 rounded-lg">
                     <p className="text-xs text-slate-600">Owner</p>
-                    <p className="text-lg font-semibold text-slate-900">{selectedVehicle.owner}</p>
+                    <p className="text-lg font-semibold text-slate-900">{getDriverName(selectedVehicle.owner)}</p>
                   </div>
                 </div>
               </div>
@@ -820,7 +848,7 @@ const VehicleManagement = () => {
                     setShowDetailsModal(false);
                   }
                 }}
-                className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="pl-4 pr-10 py-2.5 rounded-lg border border-slate-200 bg-white font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
                 <option value="">Update Status</option>
                 <option value="Active">Active</option>
@@ -874,12 +902,12 @@ const VehicleManagement = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+            className="pl-4 pr-10 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
           >
             <option value="all">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Inactive">Inactive</option>
+            <option value="Available">Available</option>
+            <option value="In Trip">In Trip</option>
+            <option value="Under Maintenance">Under Maintenance</option>
           </select>
         </div>
       </div>

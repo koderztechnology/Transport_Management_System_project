@@ -482,7 +482,7 @@ export default function TrackingAnalyticsFull() {
                     <select
                       value={tripSort.key}
                       onChange={(e) => setTripSort((s) => ({ ...s, key: e.target.value }))}
-                      className="border rounded-md px-2 py-1"
+                      className="border rounded-md pl-2 pr-10 py-1"
                     >
                       <option value="date">Date</option>
                       <option value="distKm">Distance</option>
@@ -973,7 +973,7 @@ export default function TrackingAnalyticsFull() {
 //                       onChange={(e) =>
 //                         setTripSort((s) => ({ ...s, key: e.target.value }))
 //                       }
-//                       className="border rounded-md px-2 py-1 text-sm"
+//                       className="border rounded-md pl-2 pr-10 py-1 text-sm"
 //                     >
 //                       <option value="date">Date</option>
 //                       <option value="distKm">Distance</option>

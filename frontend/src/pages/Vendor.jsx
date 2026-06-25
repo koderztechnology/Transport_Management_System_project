@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../utils/api";
 import {
   Plus,
   Edit,
@@ -28,7 +28,7 @@ export default function VendorManagement() {
 
   const fetchVendors = async () => {
     try {
-      const response = await axios.get("https://transport.koderzgroup.com/api/vendors/");
+      const response = await api.get("/vendors/");
       setVendors(response.data);
     } catch (error) {
       console.error("Error fetching vendors:", error);
@@ -38,6 +38,7 @@ export default function VendorManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editVendorId, setEditVendorId] = useState(null);
   const [showDelete, setShowDelete] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
 
   const [newVendor, setNewVendor] = useState({
     name: "",
@@ -79,8 +80,23 @@ export default function VendorManagement() {
   }).length;
 
   // Save vendor (add/edit)
+  const validateVendor = (data) => {
+    const errors = {};
+    if (!String(data.name || "").trim()) errors.name = "Vendor name is required.";
+    if (!String(data.service_type || "").trim()) errors.service_type = "Vendor type is required.";
+    if (!String(data.phone || "").trim()) errors.phone = "Phone number is required.";
+    else if (!/^\d{10}$/.test(String(data.phone).replace(/\D/g, ""))) errors.phone = "Phone number must be 10 digits.";
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email))) errors.email = "Please enter a valid email address.";
+    return errors;
+  };
+
   const handleSaveVendor = async () => {
-    if (!newVendor.name || !newVendor.phone) return;
+    const errors = validateVendor(newVendor);
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
 
     // Clean payload for Django
     const payload = { ...newVendor };
@@ -89,12 +105,12 @@ export default function VendorManagement() {
 
     try {
       if (editVendorId) {
-        const res = await axios.put(`https://transport.koderzgroup.com/api/vendors/${editVendorId}/`, payload);
+        const res = await api.put(`/vendors/${editVendorId}/`, payload);
         setVendors(
           vendors.map((v) => (v.vendor_id === editVendorId ? res.data : v))
         );
       } else {
-        const res = await axios.post("https://transport.koderzgroup.com/api/vendors/", payload);
+        const res = await api.post("/vendors/", payload);
         setVendors([
           ...vendors,
           res.data,
@@ -120,12 +136,13 @@ export default function VendorManagement() {
   const handleEdit = (vendor) => {
     setNewVendor({ ...vendor });
     setEditVendorId(vendor.vendor_id);
+    setFormErrors({});
     setShowModal(true);
   };
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`https://transport.koderzgroup.com/api/vendors/${id}/`);
+      await api.delete(`/vendors/${id}/`);
       setVendors(vendors.filter((v) => v.vendor_id !== id));
       setShowDelete(null);
     } catch (error) {
@@ -138,7 +155,7 @@ export default function VendorManagement() {
     if(!vendor) return;
     const updatedStatus = vendor.status === "Active" ? "Inactive" : "Active";
     try {
-      const res = await axios.patch(`https://transport.koderzgroup.com/api/vendors/${id}/`, { status: updatedStatus });
+      const res = await api.patch(`/vendors/${id}/`, { status: updatedStatus });
       setVendors(
         vendors.map((v) =>
           v.vendor_id === id ? res.data : v
@@ -347,6 +364,7 @@ export default function VendorManagement() {
                 label="Name *" 
                 placeholder="Vendor Name" 
                 value={newVendor.name} 
+                error={formErrors.name}
                 onChange={(e) => setNewVendor({ ...newVendor, name: e.target.value })} 
               />
 
@@ -355,7 +373,7 @@ export default function VendorManagement() {
                 <select
                   value={newVendor.service_type}
                   onChange={(e) => setNewVendor({ ...newVendor, service_type: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
+                  className={`w-full border rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900 ${formErrors.service_type ? "border-red-500" : "border-slate-200"}`}
                 >
                   <option value="">Select Vendor Type</option>
                   <option value="Maintenance">Maintenance</option>
@@ -363,6 +381,7 @@ export default function VendorManagement() {
                   <option value="Fuel">Fuel</option>
                   <option value="Toll">Toll</option>
                 </select>
+                {formErrors.service_type && <p className="mt-1 text-xs text-red-600">{formErrors.service_type}</p>}
               </div>
 
               <InputGroup 
@@ -376,6 +395,7 @@ export default function VendorManagement() {
                 label="Phone *" 
                 placeholder="+91 98765 12345" 
                 value={newVendor.phone} 
+                error={formErrors.phone}
                 onChange={(e) => setNewVendor({ ...newVendor, phone: e.target.value })} 
               />
 
@@ -394,6 +414,7 @@ export default function VendorManagement() {
                   type="email"
                   placeholder="Enter vendor email" 
                   value={newVendor.email} 
+                  error={formErrors.email}
                   onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })} 
                 />
               </div>
@@ -405,7 +426,7 @@ export default function VendorManagement() {
                 <select
                   value={newVendor.status}
                   onChange={(e) => setNewVendor({ ...newVendor, status: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
+                  className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -467,13 +488,14 @@ export default function VendorManagement() {
   );
 }
 
-const InputGroup = ({ label, type = "text", ...props }) => (
+const InputGroup = ({ label, type = "text", error, ...props }) => (
   <div>
     <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
     <input
       type={type}
-      className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 text-slate-900"
+      className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 text-slate-900 ${error ? "border-red-500" : "border-slate-200"}`}
       {...props}
     />
+    {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
   </div>
 );

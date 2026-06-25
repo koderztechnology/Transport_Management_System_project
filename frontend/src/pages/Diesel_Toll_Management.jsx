@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import api from "../utils/api";
 import {
   PieChart,
   Pie,
@@ -12,13 +13,9 @@ import {
   Bar,
   CartesianGrid,
 } from "recharts";
-// eslint-disable-next-line no-unused-vars
-import { motion } from "framer-motion";
-import axios from "axios";
+const FUEL_API_URL = "/fuel/";
+const TOLL_API_URL = "/toll/";
 
-const BASE_URL = "https://transport.koderzgroup.com/api";
-const FUEL_API_URL = `${BASE_URL}/fuel/`;
-const TOLL_API_URL = `${BASE_URL}/toll/`;
 
 export default function TransportFuelTollPage() {
   // ------------------------------------------------------------------
@@ -32,6 +29,8 @@ export default function TransportFuelTollPage() {
   const [showAddToll, setShowAddToll] = useState(false);
   const [editingFuelId, setEditingFuelId] = useState(null);
   const [editingTollId, setEditingTollId] = useState(null);
+  const [fuelErrors, setFuelErrors] = useState({});
+  const [tollErrors, setTollErrors] = useState({});
 
   const [newFuel, setNewFuel] = useState({
     vehicle: "",
@@ -52,6 +51,7 @@ export default function TransportFuelTollPage() {
   const [filterDates] = useState({ start: "", end: "" });
   const [fuelPage, setFuelPage] = useState(1);
   const [tollPage, setTollPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // ------------------------------------------------------------------
   // FETCH FROM BACKEND ON MOUNT
@@ -60,9 +60,9 @@ export default function TransportFuelTollPage() {
     const fetchFuelAndToll = async () => {
       try {
         const [fuelRes, tollRes, vehicleRes] = await Promise.all([
-          axios.get(FUEL_API_URL),
-          axios.get(TOLL_API_URL),
-          axios.get('https://transport.koderzgroup.com/api/vehicles/'),
+          api.get(FUEL_API_URL),
+          api.get(TOLL_API_URL),
+          api.get('/vehicles/'),
         ]);
 
         setFuelData(fuelRes.data || []);
@@ -90,15 +90,39 @@ export default function TransportFuelTollPage() {
   // ------------------------------------------------------------------
   // HELPERS
   // ------------------------------------------------------------------
-  const filterDataByDate = (data) => {
-    if (!filterDates.start || !filterDates.end) return data;
-    return data.filter(
-      (item) => item.date >= filterDates.start && item.date <= filterDates.end
-    );
+  const getVehicleNumber = (vId) => {
+    const found = vehicles.find(v => String(v.vehicle_id) === String(vId));
+    return found ? found.vehicle_number : `Vehicle ${vId}`;
   };
 
-  const filteredFuel = filterDataByDate(fuelData);
-  const filteredToll = filterDataByDate(tollData);
+  const filteredFuel = useMemo(() => {
+    let data = fuelData;
+    if (filterDates.start && filterDates.end) {
+      data = data.filter(item => item.date >= filterDates.start && item.date <= filterDates.end);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      data = data.filter(item => 
+        String(getVehicleNumber(item.vehicle)).toLowerCase().includes(q)
+      );
+    }
+    return data;
+  }, [fuelData, filterDates, searchQuery, vehicles]);
+
+  const filteredToll = useMemo(() => {
+    let data = tollData;
+    if (filterDates.start && filterDates.end) {
+      data = data.filter(item => item.date >= filterDates.start && item.date <= filterDates.end);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      data = data.filter(item => 
+        String(getVehicleNumber(item.vehicle)).toLowerCase().includes(q) ||
+        String(item.toll_name || "").toLowerCase().includes(q)
+      );
+    }
+    return data;
+  }, [tollData, filterDates, searchQuery, vehicles]);
 
   const barData = useMemo(() => {
     const allDates = [
@@ -186,15 +210,25 @@ export default function TransportFuelTollPage() {
   // ------------------------------------------------------------------
   // FUEL: ADD / UPDATE
   // ------------------------------------------------------------------
+  const validateFuelForm = () => {
+    const errors = {};
+    if (!String(newFuel.vehicle || "").trim()) errors.vehicle = "Please select a vehicle.";
+    if (!String(newFuel.litres || "").trim()) errors.litres = "Litres are required.";
+    else if (Number(newFuel.litres) <= 0) errors.litres = "Litres must be greater than zero.";
+    if (!String(newFuel.price_per_litre || "").trim()) errors.price_per_litre = "Price is required.";
+    else if (Number(newFuel.price_per_litre) <= 0) errors.price_per_litre = "Price must be greater than zero.";
+    if (!String(newFuel.date || "").trim()) errors.date = "Date is required.";
+    return errors;
+  };
+
   const handleAddFuel = async (e) => {
     e.preventDefault();
-    if (
-      !newFuel.vehicle ||
-      !newFuel.litres ||
-      !newFuel.price_per_litre ||
-      !newFuel.date
-    )
+    const errors = validateFuelForm();
+    if (Object.keys(errors).length > 0) {
+      setFuelErrors(errors);
       return;
+    }
+    setFuelErrors({});
 
     try {
       const formData = new FormData();
@@ -207,7 +241,7 @@ export default function TransportFuelTollPage() {
       }
 
       if (editingFuelId) {
-        const res = await axios.put(
+        const res = await api.put(
           `${FUEL_API_URL}${editingFuelId}/`,
           formData,
           {
@@ -222,7 +256,7 @@ export default function TransportFuelTollPage() {
         );
         setEditingFuelId(null);
       } else {
-        const res = await axios.post(FUEL_API_URL, formData, {
+        const res = await api.post(FUEL_API_URL, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setFuelData((prev) => [res.data, ...prev]);
@@ -244,7 +278,7 @@ export default function TransportFuelTollPage() {
 
   const deleteFuel = async (fuelId) => {
     try {
-      await axios.delete(`${FUEL_API_URL}${fuelId}/`);
+      await api.delete(`${FUEL_API_URL}${fuelId}/`);
       setFuelData((prev) => prev.filter((f) => f.fuel_id !== fuelId));
     } catch (err) {
       console.error("Error deleting fuel:", err.response?.data || err);
@@ -268,15 +302,24 @@ export default function TransportFuelTollPage() {
   // ------------------------------------------------------------------
   // TOLL: ADD / UPDATE
   // ------------------------------------------------------------------
+  const validateTollForm = () => {
+    const errors = {};
+    if (!String(newToll.vehicle || "").trim()) errors.vehicle = "Please select a vehicle.";
+    if (!String(newToll.toll_name || "").trim()) errors.toll_name = "Toll name is required.";
+    if (!String(newToll.amount || "").trim()) errors.amount = "Amount is required.";
+    else if (Number(newToll.amount) <= 0) errors.amount = "Amount must be greater than zero.";
+    if (!String(newToll.date || "").trim()) errors.date = "Date is required.";
+    return errors;
+  };
+
   const handleAddToll = async (e) => {
     e.preventDefault();
-    if (
-      !newToll.vehicle ||
-      !newToll.toll_name ||
-      !newToll.amount ||
-      !newToll.date
-    )
+    const errors = validateTollForm();
+    if (Object.keys(errors).length > 0) {
+      setTollErrors(errors);
       return;
+    }
+    setTollErrors({});
 
     try {
       const formData = new FormData();
@@ -289,7 +332,7 @@ export default function TransportFuelTollPage() {
       }
 
       if (editingTollId) {
-        const res = await axios.put(
+        const res = await api.put(
           `${TOLL_API_URL}${editingTollId}/`,
           formData,
           {
@@ -304,7 +347,7 @@ export default function TransportFuelTollPage() {
         );
         setEditingTollId(null);
       } else {
-        const res = await axios.post(TOLL_API_URL, formData, {
+        const res = await api.post(TOLL_API_URL, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setTollData((prev) => [res.data, ...prev]);
@@ -326,7 +369,7 @@ export default function TransportFuelTollPage() {
 
   const deleteToll = async (tollId) => {
     try {
-      await axios.delete(`${TOLL_API_URL}${tollId}/`);
+      await api.delete(`${TOLL_API_URL}${tollId}/`);
       setTollData((prev) => prev.filter((t) => t.toll_id !== tollId));
     } catch (err) {
       console.error("Error deleting toll:", err.response?.data || err);
@@ -374,6 +417,22 @@ export default function TransportFuelTollPage() {
           </button>
         </header>
 
+        {/* SEARCH BAR */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200/60 flex items-center">
+          <div className="relative flex-1 max-w-md">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Search by vehicle number or toll plaza..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            />
+          </div>
+        </div>
+
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
@@ -402,9 +461,8 @@ export default function TransportFuelTollPage() {
               trend: "-2.1%",
             },
           ].map((card, i) => (
-            <motion.div
+            <div
               key={i}
-              whileHover={{ y: -3, scale: 1.01 }}
               className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 hover:shadow-lg hover:border-slate-300 transition-all duration-300"
             >
               <div className="flex items-start justify-between mb-3">
@@ -431,7 +489,7 @@ export default function TransportFuelTollPage() {
               <p className="text-3xl font-bold text-slate-900">
                 {card.value}
               </p>
-            </motion.div>
+            </div>
           ))}
         </div>
 
@@ -574,7 +632,7 @@ export default function TransportFuelTollPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Vehicle
+                      Vehicle *
                     </label>
                     <select
                       value={newFuel.vehicle}
@@ -584,7 +642,7 @@ export default function TransportFuelTollPage() {
                           vehicle: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 bg-white"
+                      className={`mt-1 w-full pl-4 pr-10 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 bg-white ${fuelErrors.vehicle ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     >
                       <option value="">Select Vehicle</option>
@@ -592,11 +650,12 @@ export default function TransportFuelTollPage() {
                         <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
                       ))}
                     </select>
+                    {fuelErrors.vehicle && <p className="text-red-500 text-xs mt-1">{fuelErrors.vehicle}</p>}
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Litres
+                      Litres *
                     </label>
                     <input
                       placeholder="Enter litres"
@@ -609,14 +668,15 @@ export default function TransportFuelTollPage() {
                           litres: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${fuelErrors.litres ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
+                    {fuelErrors.litres && <p className="text-red-500 text-xs mt-1">{fuelErrors.litres}</p>}
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Price per Litre (₹)
+                      Price per Litre (₹) *
                     </label>
                     <input
                       placeholder="Enter price per litre"
@@ -629,14 +689,15 @@ export default function TransportFuelTollPage() {
                           price_per_litre: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${fuelErrors.price_per_litre ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
+                    {fuelErrors.price_per_litre && <p className="text-red-500 text-xs mt-1">{fuelErrors.price_per_litre}</p>}
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Date
+                      Date *
                     </label>
                     <input
                       type="date"
@@ -644,9 +705,10 @@ export default function TransportFuelTollPage() {
                       onChange={(e) =>
                         setNewFuel({ ...newFuel, date: e.target.value })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${fuelErrors.date ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
+                    {fuelErrors.date && <p className="text-red-500 text-xs mt-1">{fuelErrors.date}</p>}
                   </div>
 
                   <div>
@@ -855,7 +917,7 @@ export default function TransportFuelTollPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Vehicle
+                      Vehicle *
                     </label>
                     <select
                       value={newToll.vehicle}
@@ -865,7 +927,7 @@ export default function TransportFuelTollPage() {
                           vehicle: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 bg-white"
+                      className={`mt-1 w-full pl-4 pr-10 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 bg-white ${tollErrors.vehicle ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     >
                       <option value="">Select Vehicle</option>
@@ -873,11 +935,12 @@ export default function TransportFuelTollPage() {
                         <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
                       ))}
                     </select>
+                    {tollErrors.vehicle && <p className="text-red-500 text-xs mt-1">{tollErrors.vehicle}</p>}
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Toll Name
+                      Toll Name *
                     </label>
                     <input
                       placeholder="Enter toll name"
@@ -888,14 +951,15 @@ export default function TransportFuelTollPage() {
                           toll_name: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${tollErrors.toll_name ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
+                    {tollErrors.toll_name && <p className="text-red-500 text-xs mt-1">{tollErrors.toll_name}</p>}
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Amount (₹)
+                      Amount (₹) *
                     </label>
                     <input
                       placeholder="Enter amount"
@@ -908,14 +972,15 @@ export default function TransportFuelTollPage() {
                           amount: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${tollErrors.amount ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
+                    {tollErrors.amount && <p className="text-red-500 text-xs mt-1">{tollErrors.amount}</p>}
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-slate-600">
-                      Date
+                      Date *
                     </label>
                     <input
                       type="date"
@@ -926,9 +991,10 @@ export default function TransportFuelTollPage() {
                           date: e.target.value,
                         })
                       }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                      className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${tollErrors.date ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
+                    {tollErrors.date && <p className="text-red-500 text-xs mt-1">{tollErrors.date}</p>}
                   </div>
 
                   <div>

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:all": "concurrently \"npm run dev\" \"cd ../backend/TMS_project && ..\\env\\Scripts\\python.exe manage.py runserver\"",
+    "dev:all": "concurrently \"npm run dev\" \"cd ../backend/TMS_project && ..\\..\\..\\.venv\\Scripts\\python.exe manage.py runserver\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

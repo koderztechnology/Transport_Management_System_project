@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useLocation } from 'react-router-dom';
+import api from '../utils/api';
 
 const AccountsFinance = () => {
+  const location = useLocation();
   // ========================================
   // STATE MANAGEMENT
   // ========================================
@@ -21,9 +23,9 @@ const AccountsFinance = () => {
   const fetchRelatedData = async () => {
     try {
       const [vRes, tRes, venRes] = await Promise.all([
-        axios.get('https://transport.koderzgroup.com/api/vehicles/'),
-        axios.get('https://transport.koderzgroup.com/api/trips/'),
-        axios.get('https://transport.koderzgroup.com/api/vendors/')
+        api.get('/vehicles/'),
+        api.get('/trips/'),
+        api.get('/vendors/')
       ]);
       setVehicles(vRes.data);
       setTrips(tRes.data);
@@ -35,7 +37,7 @@ const AccountsFinance = () => {
 
   const fetchTransactions = async () => {
     try {
-      const res = await axios.get('https://transport.koderzgroup.com/api/finance-transactions/');
+      const res = await api.get('/finance-transactions/');
       const mapped = res.data.map(t => ({
         id: t.transaction_id,
         date: t.date || '',
@@ -123,6 +125,8 @@ const AccountsFinance = () => {
   const filteredTransactions = transactions.filter(txn => {
     const matchesSearch = searchQuery === '' || 
       String(txn.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(txn.category || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(txn.type || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(txn.id || "").toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesType = filterType === 'All' || txn.type === filterType;
@@ -130,6 +134,34 @@ const AccountsFinance = () => {
     
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  const handleDownloadReport = () => {
+    const headers = ["Transaction ID", "Date", "Type", "Description", "Amount", "Status", "Category"];
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [
+        headers.join(","),
+        ...filteredTransactions.map((t) =>
+          [
+            t.id,
+            t.date,
+            t.type,
+            `"${t.description}"`,
+            t.amount,
+            t.status,
+            `"${t.category}"`
+          ].join(",")
+        ),
+      ].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "finance_report.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Get status class
   const getStatusClass = (status) => {
@@ -253,6 +285,17 @@ const AccountsFinance = () => {
     setFormErrors({});
   };
 
+  // Handle query parameter actions
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const action = params.get('action');
+    if (action === 'addExpense') {
+      handleAddExpense();
+    } else if (action === 'addIncome' || action === 'addTransaction') {
+      handleAddIncome();
+    }
+  }, [location.search]);
+
   // Handle input change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -272,6 +315,7 @@ const AccountsFinance = () => {
   // Validate form
   const validateForm = () => {
     const errors = {};
+    const amountValue = Number(formData.amount);
 
     if (!formData.date) {
       errors.date = 'Date is required';
@@ -281,8 +325,8 @@ const AccountsFinance = () => {
       errors.description = 'Description is required';
     }
 
-    if (!formData.amount || formData.amount <= 0) {
-      errors.amount = 'Amount must be greater than 0';
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      errors.amount = 'Amount must be a positive number';
     }
 
     if (!formData.category) {
@@ -316,10 +360,10 @@ const AccountsFinance = () => {
     try {
       if (isEditMode) {
         // UPDATE existing transaction
-        await axios.put(`https://transport.koderzgroup.com/api/finance-transactions/${editingTransactionId}/`, payload);
+        await api.put(`/finance-transactions/${editingTransactionId}/`, payload);
       } else {
         // ADD new transaction
-        await axios.post('https://transport.koderzgroup.com/api/finance-transactions/', payload);
+        await api.post('/finance-transactions/', payload);
       }
       fetchTransactions();
       handleCloseModal();
@@ -340,7 +384,7 @@ const AccountsFinance = () => {
 
     if (confirmed) {
       try {
-        await axios.delete(`http://127.0.0.1:8000/api/finance-transactions/${txn.id}/`);
+        await api.delete(`/finance-transactions/${txn.id}/`);
         fetchTransactions();
       } catch (err) {
         console.error('Error deleting transaction', err);
@@ -421,7 +465,10 @@ const AccountsFinance = () => {
         
         {/* Primary actions in header */}
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+          <button 
+            onClick={handleDownloadReport}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+          >
             <span className="material-symbols-outlined text-base">download</span>
             Download Report
           </button>
@@ -499,7 +546,7 @@ const AccountsFinance = () => {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             >
               <option value="All">All Types</option>
               <option value="Income">Income</option>
@@ -508,7 +555,7 @@ const AccountsFinance = () => {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             >
               <option value="All">All Status</option>
               <option value="Completed">Completed</option>
@@ -805,7 +852,7 @@ const AccountsFinance = () => {
                     value={formData.type}
                     onChange={handleInputChange}
                     disabled
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-900 focus:outline-none cursor-not-allowed"
+                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-900 focus:outline-none cursor-not-allowed"
                   >
                     <option value="Income">Income</option>
                     <option value="Expense">Expense</option>
@@ -844,7 +891,7 @@ const AccountsFinance = () => {
                   name="category"
                   value={formData.category}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                  className={`w-full pl-4 pr-10 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
                     formErrors.category 
                       ? 'border-red-500 focus:ring-red-500' 
                       : 'border-slate-200 focus:ring-primary/50'
@@ -868,7 +915,7 @@ const AccountsFinance = () => {
                     name="vehicle"
                     value={formData.vehicle}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
                     <option value="">Select Vehicle</option>
                     {vehicles.slice(0, 100).map(v => (
@@ -882,7 +929,7 @@ const AccountsFinance = () => {
                     name="trip"
                     value={formData.trip}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
                     <option value="">Select Trip</option>
                     {trips.slice(0, 100).map(t => (
@@ -898,7 +945,7 @@ const AccountsFinance = () => {
                     name="vendor"
                     value={formData.vendor}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
                     <option value="">Select Vendor</option>
                     {vendors.slice(0, 100).map(ven => (
@@ -941,7 +988,7 @@ const AccountsFinance = () => {
                     name="status"
                     value={formData.status}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
                     <option value="Completed">Completed</option>
                     <option value="Pending">Pending</option>

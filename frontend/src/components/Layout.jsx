@@ -7,7 +7,7 @@ const Layout = ({ children }) => {
       <Sidebar />
       
       {/* Main Content Area with Left Margin for Fixed Sidebar */}
-      <div className="flex-1 ml-60 flex flex-col overflow-y-auto">
+      <div className="flex-1 lg:ml-60 ml-0 flex flex-col overflow-y-auto">
         <TopNavBar />
         <main className="flex-1 overflow-y-auto bg-slate-50">
           {children}

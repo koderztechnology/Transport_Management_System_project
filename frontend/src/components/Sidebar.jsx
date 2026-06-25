@@ -98,7 +98,7 @@ const Sidebar = () => {
         <div className="flex h-full flex-col">
           {/* Header with Logo */}
           <div className="px-4 py-5 border-b border-slate-200">
-            <div className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-3 rounded-lg transition-colors hover:bg-slate-50 px-2 py-1">
               <div className="bg-indigo-600 p-2 rounded-lg shadow-sm">
                 <span className="material-symbols-outlined text-white text-[22px]">local_shipping</span>
               </div>
@@ -110,7 +110,7 @@ const Sidebar = () => {
                   Transport System
                 </p>
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* Navigation */}

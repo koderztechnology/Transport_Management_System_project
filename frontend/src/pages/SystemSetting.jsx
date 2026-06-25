@@ -33,6 +33,7 @@ const CompanySettings = ({ data, onSave }) => {
     city: "",
     state: "",
   });
+  const [errors, setErrors] = useState({});
 
   // Load existing company data into form
   useEffect(() => {
@@ -47,9 +48,21 @@ const CompanySettings = ({ data, onSave }) => {
   };
 
   // Save
+  const validate = () => {
+    const validationErrors = {};
+    if (!form.name.trim()) validationErrors.name = "Company name is required.";
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) validationErrors.email = "Please enter a valid email address.";
+    if (form.phone && !/^\d{10}$/.test(String(form.phone).replace(/\D/g, ""))) validationErrors.phone = "Phone number must be 10 digits.";
+    if (form.gst && !/^[0-9A-Z]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(form.gst)) validationErrors.gst = "GST number format is invalid.";
+    return validationErrors;
+  };
+
   const handleSave = () => {
-    if (!form.name.trim())
-      return onSave(false, "Company name is required");
+    const validationErrors = validate();
+    setErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      return onSave(false, "Please fix the highlighted fields");
+    }
 
     onSave(true, "Company settings saved successfully!", {
       company: form,
@@ -75,6 +88,7 @@ const CompanySettings = ({ data, onSave }) => {
           value={form.name} 
           onChange={handleChange("name")} 
           placeholder="ABC Transport Services" 
+          error={errors.name}
         />
 
         {/* Email */}
@@ -84,6 +98,7 @@ const CompanySettings = ({ data, onSave }) => {
           value={form.email} 
           onChange={handleChange("email")} 
           placeholder="info@company.com" 
+          error={errors.email}
         />
 
         {/* Phone */}
@@ -92,6 +107,7 @@ const CompanySettings = ({ data, onSave }) => {
           value={form.phone} 
           onChange={handleChange("phone")} 
           placeholder="+91 98765 43210" 
+          error={errors.phone}
         />
 
         {/* GST */}
@@ -100,6 +116,7 @@ const CompanySettings = ({ data, onSave }) => {
           value={form.gst} 
           onChange={handleChange("gst")} 
           placeholder="22AAAAA0000A1Z5" 
+          error={errors.gst}
         />
 
         {/* PAN */}
@@ -156,9 +173,8 @@ const defaults = {
   };
 // Profile Settings Component
 const ProfileSettings = ({ data, onSave }) => {
-  
-
   const [form, setForm] = useState(defaults);
+  const [errors, setErrors] = useState({});
 
   // Load saved profile data
   useEffect(() => {
@@ -169,8 +185,12 @@ const ProfileSettings = ({ data, onSave }) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   const handleSave = () => {
-    if (!form.name.trim()) return onSave(false, "Full name is required");
-    if (!form.phone.trim()) return onSave(false, "Phone number is required");
+    const validationErrors = {};
+    if (!form.name.trim()) validationErrors.name = "Full name is required";
+    if (!form.phone.trim()) validationErrors.phone = "Phone number is required";
+    else if (!/^\d{10}$/.test(String(form.phone).replace(/\D/g, ""))) validationErrors.phone = "Phone number must be 10 digits";
+    setErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) return onSave(false, "Please fix the highlighted fields");
 
     onSave(true, "Profile updated", { profile: form });
   };
@@ -198,6 +218,7 @@ const ProfileSettings = ({ data, onSave }) => {
           value={form.name} 
           onChange={change("name")} 
           placeholder="Enter full name" 
+          error={errors.name}
         />
 
         {/* Email */}
@@ -218,6 +239,7 @@ const ProfileSettings = ({ data, onSave }) => {
           value={form.phone} 
           onChange={change("phone")} 
           placeholder="+91 98765 43210" 
+          error={errors.phone}
         />
 
         {/* Role */}
@@ -697,14 +719,15 @@ const SettingsPage = () => {
 };
 
 // Helper Components
-const InputGroup = ({ label, type = "text", ...props }) => (
+const InputGroup = ({ label, type = "text", error, ...props }) => (
   <div>
     <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
     <input
       type={type}
-      className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 text-slate-900"
+      className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 text-slate-900 ${error ? "border-red-500" : "border-slate-200"}`}
       {...props}
     />
+    {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
   </div>
 );
 
@@ -712,7 +735,7 @@ const SelectGroup = ({ label, children, ...props }) => (
   <div>
     <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
     <select
-      className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
+      className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
       {...props}
     >
       {children}

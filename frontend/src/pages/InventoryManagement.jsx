@@ -1,6 +1,6 @@
 /* eslint-disable no-irregular-whitespace */
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 const InventoryManagement = () => {
   // ========================================
@@ -18,8 +18,8 @@ const InventoryManagement = () => {
   const fetchData = async () => {
     try {
       const [invRes, venRes] = await Promise.all([
-        axios.get("https://transport.koderzgroup.com/api/inventory/"),
-        axios.get("https://transport.koderzgroup.com/api/vendors/")
+        api.get("/inventory/"),
+        api.get("/vendors/")
       ]);
       const mappedItems = invRes.data.map(item => ({
         id: item.item_id,
@@ -152,10 +152,21 @@ const InventoryManagement = () => {
   // Validate form fields
   const validateForm = () => {
     const errors = {};
+    const quantityValue = Number(formData.quantity);
+    const reorderValue = Number(formData.reorderLevel);
+    const unitPriceValue = Number(formData.unit_price);
+
     if (!formData.name.trim()) errors.name = 'Item name is required';
     if (!formData.category) errors.category = 'Category is required';
-    if (!formData.quantity || formData.quantity <= 0) errors.quantity = 'Quantity must be greater than 0';
-    if (!formData.reorderLevel || formData.reorderLevel < 0) errors.reorderLevel = 'Reorder level must be 0 or greater';
+    if (!Number.isFinite(quantityValue) || quantityValue <= 0 || !Number.isInteger(quantityValue)) {
+      errors.quantity = 'Quantity must be a whole number greater than 0';
+    }
+    if (!Number.isFinite(reorderValue) || reorderValue < 0 || !Number.isInteger(reorderValue)) {
+      errors.reorderLevel = 'Reorder level must be a whole number of 0 or greater';
+    }
+    if (formData.unit_price && (!Number.isFinite(unitPriceValue) || unitPriceValue < 0)) {
+      errors.unit_price = 'Unit price must be 0 or greater';
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -178,9 +189,9 @@ const InventoryManagement = () => {
 
     try {
       if (isEditMode) {
-        await axios.put(`https://transport.koderzgroup.com/api/inventory/${editingItemId}/`, itemData);
+        await api.put(`/inventory/${editingItemId}/`, itemData);
       } else {
-        await axios.post("https://transport.koderzgroup.com/api/inventory/", itemData);
+        await api.post("/inventory/", itemData);
       }
       fetchData();
       handleCloseModal();
@@ -199,7 +210,7 @@ const InventoryManagement = () => {
     );
     if (confirmed) {
       try {
-        await axios.delete(`https://transport.koderzgroup.com/api/inventory/${item.id}/`);
+        await api.delete(`/inventory/${item.id}/`);
         fetchData();
       } catch (err) {
         console.error(err);
@@ -363,7 +374,7 @@ const InventoryManagement = () => {
     	  		<select
     	  		  value={filterCategory}
     	  		  onChange={(e) => setFilterCategory(e.target.value)}
-    	  		  className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+    	  		  className="pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
     	  		>
     	  		  <option value="All">All Categories</option>
     	  		  <option value="Tyres">Tyres</option>
@@ -698,7 +709,7 @@ const InventoryManagement = () => {
     	  		  name="category"
       		  value={formData.category}
       		  onChange={handleInputChange}
-      		  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all 
+      		  className={`w-full pl-4 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all 
       		  ${formErrors.category ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 focus:ring-primary'}`}
       		>
       		  <option value="">Select category</option>
@@ -776,7 +787,7 @@ const InventoryManagement = () => {
               name="vendor"
               value={formData.vendor}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all bg-white"
+              className="w-full pl-4 pr-10 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all bg-white"
             >
               <option value="">Select Vendor</option>
               {vendors.slice(0, 100).map(v => (

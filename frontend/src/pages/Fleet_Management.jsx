@@ -1,4 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+// eslint-disable-next-line no-unused-vars
+import { motion } from "framer-motion";
+import api from "../utils/api";
 import {
   MapContainer,
   TileLayer,
@@ -19,8 +22,6 @@ import {
 } from "recharts";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-// eslint-disable-next-line no-unused-vars
-import { motion } from "framer-motion";
 
 // Custom truck icon
 const truckIcon = new L.Icon({
@@ -107,13 +108,83 @@ const fuelCosts = [
 ];
 
 export default function FleetDashboard() {
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [trackingLogs, setTrackingLogs] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formData, setFormData] = useState({
+    vehicleNumber: '',
+    vehicleType: 'Truck',
+    modelName: '',
+    capacity: '',
+    driverId: '',
+  });
+  const [formErrors, setFormErrors] = useState({});
+
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortKey, setSortKey] = useState("id");
   const [sortAsc, setSortAsc] = useState(true);
 
+  const fetchData = async () => {
+    try {
+      const [vRes, dRes, tRes] = await Promise.all([
+        api.get('/vehicles/'),
+        api.get('/drivers/'),
+        api.get('/tracking/')
+      ]);
+      setVehicles(vRes.data || []);
+      setDrivers(dRes.data || []);
+      setTrackingLogs(tRes.data || []);
+    } catch (err) {
+      console.error("Error fetching fleet data:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const mapDbStatusToUi = (status) => {
+    if (status === 'Available') return 'Active';
+    if (status === 'In Trip') return 'In Transit';
+    if (status === 'Under Maintenance') return 'Maintenance';
+    return status;
+  };
+
+  const fleetList = useMemo(() => {
+    return vehicles.map((v) => {
+      const track = trackingLogs.find((t) => t.vehicle === v.vehicle_number);
+      const drv = drivers.find((d) => d.driver_id === v.driver);
+      
+      let lat = 18.5204;
+      let lng = 73.8567;
+      if (track && track.latitude && track.longitude) {
+        lat = parseFloat(track.latitude);
+        lng = parseFloat(track.longitude);
+      } else {
+        const randSeed = (v.vehicle_id || 0) * 0.05;
+        lat = 18.5204 + Math.sin(randSeed) * 2;
+        lng = 73.8567 + Math.cos(randSeed) * 2;
+      }
+      
+      return {
+        id: `VH-${v.vehicle_id}`,
+        dbId: v.vehicle_id,
+        reg: v.vehicle_number || '',
+        type: v.make || 'Truck',
+        capacity: v.capacity || '10 ton',
+        driver: drv ? drv.name : (v.driver ? `Driver ${v.driver}` : 'Unassigned'),
+        status: mapDbStatusToUi(v.status || 'Available'),
+        lastService: v.added_date ? v.added_date.split('T')[0] : 'Pending',
+        fuelEfficiency: track ? parseFloat((4.0 + (track.speed / 20)).toFixed(1)) : 4.2,
+        location: [lat, lng],
+      };
+    });
+  }, [vehicles, drivers, trackingLogs]);
+
   const filtered = useMemo(() => {
-    const filteredData = FLEET.filter((v) => {
+    const filteredData = fleetList.filter((v) => {
       const matchesQuery =
         query === "" ||
         String(v.id || "").toLowerCase().includes(query.toLowerCase()) ||
@@ -131,27 +202,105 @@ export default function FleetDashboard() {
           ? new Date(a.lastService) - new Date(b.lastService)
           : new Date(b.lastService) - new Date(a.lastService);
       } else {
-        return sortAsc
-          ? a[sortKey].localeCompare(b[sortKey])
-          : b[sortKey].localeCompare(a[sortKey]);
+        const aVal = String(a[sortKey] || "");
+        const bVal = String(b[sortKey] || "");
+        return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
     });
-  }, [query, statusFilter, sortKey, sortAsc]);
+  }, [query, statusFilter, sortKey, sortAsc, fleetList]);
 
   const counts = useMemo(() => {
-    const total = FLEET.length;
-    const active = FLEET.filter((f) => f.status === "Active").length;
-    const inTransit = FLEET.filter((f) => f.status === "In Transit").length;
-    const maintenance = FLEET.filter((f) => f.status === "Maintenance").length;
-    const idle = FLEET.filter((f) => f.status === "Idle").length;
+    const total = fleetList.length;
+    const active = fleetList.filter((f) => f.status === "Active").length;
+    const inTransit = fleetList.filter((f) => f.status === "In Transit").length;
+    const maintenance = fleetList.filter((f) => f.status === "Maintenance").length;
+    const idle = fleetList.filter((f) => f.status === "Idle").length;
     return { total, active, inTransit, maintenance, idle };
-  }, []);
+  }, [fleetList]);
 
   const handleSort = (key) => {
     if (key === sortKey) setSortAsc(!sortAsc);
     else {
       setSortKey(key);
       setSortAsc(true);
+    }
+  };
+
+  const handleExportReport = () => {
+    const headers = ["Vehicle ID", "Registration Number", "Type", "Capacity", "Driver", "Status", "Last Service", "Fuel Efficiency"];
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [
+        headers.join(","),
+        ...filtered.map((v) =>
+          [
+            v.id,
+            v.reg,
+            v.type,
+            v.capacity,
+            `"${v.driver}"`,
+            v.status,
+            v.lastService,
+            v.fuelEfficiency
+          ].join(",")
+        ),
+      ].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "fleet_report.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!formData.vehicleNumber.trim()) errors.vehicleNumber = "Vehicle number is required";
+    if (!formData.modelName.trim()) errors.modelName = "Model name is required";
+    if (!formData.capacity.trim()) errors.capacity = "Capacity is required";
+    return errors;
+  };
+
+  const handleAddVehicleSubmit = async (e) => {
+    e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
+
+    const payload = {
+      vehicle_number: formData.vehicleNumber,
+      make: formData.vehicleType,
+      model: formData.modelName,
+      capacity: formData.capacity,
+      driver: formData.driverId || null,
+      status: 'Available',
+    };
+
+    try {
+      await api.post('/vehicles/', payload);
+      fetchData();
+      setShowAddModal(false);
+      setFormData({
+        vehicleNumber: '',
+        vehicleType: 'Truck',
+        modelName: '',
+        capacity: '',
+        driverId: '',
+      });
+      alert('Vehicle added successfully to fleet!');
+    } catch (err) {
+      console.error(err);
+      alert('Error adding vehicle');
     }
   };
 
@@ -170,11 +319,17 @@ export default function FleetDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors">
+            <button
+              onClick={handleExportReport}
+              className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors cursor-pointer"
+            >
               <span className="material-symbols-outlined text-lg">download</span>
               <span className="text-sm">Export Report</span>
             </button>
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors cursor-pointer"
+            >
               <span className="material-symbols-outlined text-lg">add</span>
               <span className="text-sm">Add Vehicle</span>
             </button>
@@ -376,7 +531,7 @@ export default function FleetDashboard() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="pl-4 pr-10 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
                 <option value="All">All Status</option>
                 <option value="Active">Active</option>
@@ -462,6 +617,107 @@ export default function FleetDashboard() {
           </div>
         </div>
       </div>
+      
+      {/* Add Vehicle Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex justify-between items-center p-6 border-b border-slate-200">
+              <h2 className="text-xl font-bold text-slate-900">Add Vehicle to Fleet</h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleAddVehicleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Number *</label>
+                <input
+                  type="text"
+                  name="vehicleNumber"
+                  value={formData.vehicleNumber}
+                  onChange={handleFormChange}
+                  placeholder="e.g. MH12AB1234"
+                  className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white ${formErrors.vehicleNumber ? 'border-red-500' : 'border-slate-200'}`}
+                  required
+                />
+                {formErrors.vehicleNumber && <p className="text-red-500 text-xs mt-1">{formErrors.vehicleNumber}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
+                <select
+                  name="vehicleType"
+                  value={formData.vehicleType}
+                  onChange={handleFormChange}
+                  className="w-full pl-4 pr-10 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                >
+                  <option value="Truck">Truck</option>
+                  <option value="Trailer">Trailer</option>
+                  <option value="Van">Van</option>
+                  <option value="Dumper">Dumper</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Model Name *</label>
+                <input
+                  type="text"
+                  name="modelName"
+                  value={formData.modelName}
+                  onChange={handleFormChange}
+                  placeholder="e.g. Prima 4923"
+                  className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white ${formErrors.modelName ? 'border-red-500' : 'border-slate-200'}`}
+                  required
+                />
+                {formErrors.modelName && <p className="text-red-500 text-xs mt-1">{formErrors.modelName}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Capacity *</label>
+                <input
+                  type="text"
+                  name="capacity"
+                  value={formData.capacity}
+                  onChange={handleFormChange}
+                  placeholder="e.g. 10 ton"
+                  className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white ${formErrors.capacity ? 'border-red-500' : 'border-slate-200'}`}
+                  required
+                />
+                {formErrors.capacity && <p className="text-red-500 text-xs mt-1">{formErrors.capacity}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Assigned Driver</label>
+                <select
+                  name="driverId"
+                  value={formData.driverId}
+                  onChange={handleFormChange}
+                  className="w-full pl-4 pr-10 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                >
+                  <option value="">Select Driver</option>
+                  {drivers.map(d => (
+                    <option key={d.driver_id} value={d.driver_id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 font-medium hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition cursor-pointer"
+                >
+                  Add Vehicle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,5 @@
 
 const PaymentTracking = () => {
-
-
   const vendorPayments = [
     { id: 'VP001', vendor: 'ABC Diesel Station', amount: 45000, dueDate: '2024-11-15', status: 'pending', category: 'Fuel' },
     { id: 'VP002', vendor: 'XYZ Auto Repairs', amount: 28500, dueDate: '2024-11-12', status: 'overdue', category: 'Maintenance' },

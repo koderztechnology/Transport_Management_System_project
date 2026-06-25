@@ -29,7 +29,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------
 # SECRET KEY & DEBUG
 # ---------------------------------------------------------
-SECRET_KEY = os.getenv("SECRET_KEY")  # FIXED (no typo)
+SECRET_KEY = os.getenv("SECRET_KEY") or "django-insecure-fallback-secret-key-12345"  # FIXED (no typo)
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
@@ -95,19 +95,33 @@ WSGI_APPLICATION = "TMS_project.wsgi.application"
 # ---------------------------------------------------------
 # DATABASES
 # ---------------------------------------------------------
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST"),
-        "PORT": os.getenv("DB_PORT"),
-        "OPTIONS": {
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+
+if DB_NAME and DB_USER and DB_HOST:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": DB_NAME,
+            "USER": DB_USER,
+            "PASSWORD": DB_PASSWORD or "",
+            "HOST": DB_HOST,
+            "PORT": DB_PORT or "3306",
+            "OPTIONS": {
+                "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            },
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # ---------------------------------------------------------
 # PASSWORD VALIDATION
@@ -143,8 +157,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 # ---------------------------------------------------------
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = ["*"]
-CORS_ALLOW_METHODS = ["*"]
 
 # ---------------------------------------------------------
 # AUTO FIELD
@@ -160,3 +172,17 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ],
 }
+
+SESSION_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+from django.db.backends.signals import connection_created
+from django.dispatch import receiver
+
+@receiver(connection_created)
+def disable_sqlite_fkeys(sender, connection, **kwargs):
+    if connection.vendor == 'sqlite':
+        with connection.cursor() as cursor:
+            cursor.execute('PRAGMA foreign_keys = OFF;')

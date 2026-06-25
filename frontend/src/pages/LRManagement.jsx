@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useState, useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
+import api from "../utils/api";
 import {
   Plus,
   FileText,
@@ -27,18 +28,27 @@ export default function LRManagement() {
   const [ewayBills, setEwayBills] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
+  const location = useLocation();
 
   useEffect(() => {
     fetchLRs();
     fetchRelatedData();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const action = params.get("action");
+    if (action === "add") {
+      setShowCreate(true);
+    }
+  }, [location.search]);
+
   const fetchRelatedData = async () => {
     try {
       const [vRes, dRes, eRes] = await Promise.all([
-        axios.get("https://transport.koderzgroup.com/api/vehicles/"),
-        axios.get("https://transport.koderzgroup.com/api/drivers/"),
-        axios.get("https://transport.koderzgroup.com/api/eway-bills/")
+        api.get("/vehicles/"),
+        api.get("/drivers/"),
+        api.get("/eway-bills/")
       ]);
       setVehicles(vRes.data || []);
       setDrivers(dRes.data || []);
@@ -50,7 +60,7 @@ export default function LRManagement() {
 
   const fetchLRs = async () => {
     try {
-      const res = await axios.get("https://transport.koderzgroup.com/api/lr-bilty/");
+      const res = await api.get("/lr-bilty/");
       const mapped = res.data.map(item => ({
         id: item.lr_id,
         lrNumber: item.lr_number || "",
@@ -82,17 +92,50 @@ export default function LRManagement() {
   // actions dropdown open id
   const [menuOpenFor, setMenuOpenFor] = useState(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const getVehicleNumber = (vId) => {
+    const found = vehicles.find(v => String(v.vehicle_id) === String(vId));
+    return found ? found.vehicle_number : `Vehicle ${vId}`;
+  };
+
+  const getDriverName = (dId) => {
+    const found = drivers.find(d => String(d.driver_id) === String(dId));
+    return found ? found.name : `Driver ${dId}`;
+  };
+
+  const filteredLR = useMemo(() => {
+    return lrData.filter(row => {
+      const vNum = getVehicleNumber(row.vehicle);
+      const dName = getDriverName(row.driver);
+      
+      const matchesSearch =
+        String(row.lrNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(row.consignor || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(row.consignee || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(row.route || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(vNum).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(dName).toLowerCase().includes(searchQuery.toLowerCase());
+        
+      const matchesStatus =
+        statusFilter === "All" || String(row.status || "").toLowerCase() === statusFilter.toLowerCase();
+        
+      return matchesSearch && matchesStatus;
+    });
+  }, [lrData, searchQuery, statusFilter, vehicles, drivers]);
+
   /* -------------------- Pagination helpers -------------------- */
-  const totalPages = Math.max(1, Math.ceil(lrData.length / rowsPerPage));
+  const totalPages = Math.max(1, Math.ceil(filteredLR.length / rowsPerPage));
   const indexOfLast = currentPage * rowsPerPage;
   const indexOfFirst = indexOfLast - rowsPerPage;
-  const currentLRs = lrData.slice(indexOfFirst, indexOfLast);
+  const currentLRs = filteredLR.slice(indexOfFirst, indexOfLast);
 
   const stats = {
-    totalLR: lrData.length,
-    pendingLR: lrData.filter((l) => l.status === "pending").length,
-    completedLR: lrData.filter((l) => l.status === "billed").length,
-    monthlyLR: lrData.filter((l) => l.date?.startsWith("2025-02")).length,
+    totalLR: filteredLR.length,
+    pendingLR: filteredLR.filter((l) => l.status === "pending").length,
+    completedLR: filteredLR.filter((l) => l.status === "billed").length,
+    monthlyLR: filteredLR.filter((l) => l.date?.startsWith("2025-02")).length,
   };
 
   /* -------------------- CRUD Actions -------------------- */
@@ -112,7 +155,7 @@ export default function LRManagement() {
         eway: newBill.eway || null,
         status: newBill.status === "in-transit" ? "In-Transit" : newBill.status.charAt(0).toUpperCase() + newBill.status.slice(1)
       };
-      await axios.post("https://transport.koderzgroup.com/api/lr-bilty/", payload);
+      await api.post("/lr-bilty/", payload);
       fetchLRs();
       setShowCreate(false);
       setCurrentPage(1);
@@ -149,7 +192,7 @@ export default function LRManagement() {
         eway: updated.eway || null,
         status: updated.status === "in-transit" ? "In-Transit" : updated.status.charAt(0).toUpperCase() + updated.status.slice(1)
       };
-      await axios.put(`https://transport.koderzgroup.com/api/lr-bilty/${updated.id}/`, payload);
+      await api.put(`/lr-bilty/${updated.id}/`, payload);
       fetchLRs();
       setShowEdit(false);
       setSelectedLR(null);
@@ -161,7 +204,7 @@ export default function LRManagement() {
   const handleDeleteConfirmed = async () => {
     if (!selectedLR) return;
     try {
-      await axios.delete(`https://transport.koderzgroup.com/api/lr-bilty/${selectedLR.id}/`);
+      await api.delete(`/lr-bilty/${selectedLR.id}/`);
       fetchLRs();
       setShowDelete(false);
       setSelectedLR(null);
@@ -180,7 +223,7 @@ export default function LRManagement() {
     else nextStatus = "Pending";
 
     try {
-      await axios.patch(`https://transport.koderzgroup.com/api/lr-bilty/${id}/`, { status: nextStatus });
+      await api.patch(`/lr-bilty/${id}/`, { status: nextStatus });
       fetchLRs();
       setMenuOpenFor(null);
     } catch(err) {
@@ -291,6 +334,37 @@ export default function LRManagement() {
 
       {/* Main Table Card */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        {/* Search & Filters */}
+        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white">
+          <div className="relative flex-1 w-full max-w-md">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Search LR number, consignor, consignee, route..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full sm:w-48 pl-4 pr-10 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
+          >
+            <option value="All">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="in-transit">In-Transit</option>
+            <option value="billed">Billed</option>
+          </select>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -458,14 +532,14 @@ export default function LRManagement() {
               <InputGroup label="Route" name="route" value={form.route} onChange={handleFormChange} placeholder="Origin → Destination" />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle</label>
-                <select name="vehicle" value={form.vehicle} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                <select name="vehicle" value={form.vehicle} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
                   <option value="">Select Vehicle</option>
                   {vehicles.slice(0, 100).map(v => <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Driver</label>
-                <select name="driver" value={form.driver} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                <select name="driver" value={form.driver} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
                   <option value="">Select Driver</option>
                   {drivers.slice(0, 100).map(d => <option key={d.driver_id} value={d.driver_id}>{d.name || `Driver ${d.driver_id}`}</option>)}
                 </select>
@@ -475,7 +549,7 @@ export default function LRManagement() {
               <InputGroup label="Freight" name="freight" value={form.freight} onChange={handleFormChange} placeholder="Amount (₹)" />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Eway Bill</label>
-                <select name="eway" value={form.eway} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                <select name="eway" value={form.eway} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
                   <option value="">Select EWay Bill</option>
                   {ewayBills.map(e => <option key={e.eway_id} value={e.eway_id}>{e.eway_number || `EWay ${e.eway_id}`}</option>)}
                 </select>
@@ -487,7 +561,7 @@ export default function LRManagement() {
                   name="status"
                   value={form.status}
                   onChange={handleFormChange}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
+                  className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
                 >
                   <option value="pending">Pending</option>
                   <option value="in-transit">In-Transit</option>
@@ -666,7 +740,7 @@ function EditModal({ lr, vehicles, drivers, ewayBills, onClose, onSave }) {
           <InputGroup label="Route" name="route" value={editForm.route} onChange={handleChange} />
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle</label>
-            <select name="vehicle" value={editForm.vehicle} onChange={handleChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+            <select name="vehicle" value={editForm.vehicle} onChange={handleChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
               <option value="">Select Vehicle</option>
               {vehicles.slice(0, 100).map(v => <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>)}
             </select>
@@ -674,14 +748,14 @@ function EditModal({ lr, vehicles, drivers, ewayBills, onClose, onSave }) {
           <InputGroup label="Freight" name="freight" value={editForm.freight} onChange={handleChange} />
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Driver</label>
-            <select name="driver" value={editForm.driver} onChange={handleChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+            <select name="driver" value={editForm.driver} onChange={handleChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
               <option value="">Select Driver</option>
               {drivers.slice(0, 100).map(d => <option key={d.driver_id} value={d.driver_id}>{d.name || `Driver ${d.driver_id}`}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Eway Bill</label>
-            <select name="eway" value={editForm.eway || ""} onChange={handleChange} className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+            <select name="eway" value={editForm.eway || ""} onChange={handleChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
               <option value="">Select EWay Bill</option>
               {ewayBills.map(e => <option key={e.eway_id} value={e.eway_id}>{e.eway_number || `EWay ${e.eway_id}`}</option>)}
             </select>
@@ -693,7 +767,7 @@ function EditModal({ lr, vehicles, drivers, ewayBills, onClose, onSave }) {
               name="status"
               value={editForm.status}
               onChange={handleChange}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
+              className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
             >
               <option value="pending">Pending</option>
               <option value="in-transit">In-Transit</option>
