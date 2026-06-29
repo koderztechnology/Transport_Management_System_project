@@ -16,6 +16,8 @@ import {
 
 export default function VendorManagement() {
   const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+  const userRole = localStorage.getItem('user_role') || 'Admin';
 
   const [currentPage, setCurrentPage] = useState(1);
   const vendorsPerPage = 10;
@@ -33,6 +35,105 @@ export default function VendorManagement() {
     } catch (error) {
       console.error("Error fetching vendors:", error);
     }
+  };
+
+  const handleExportCSV = () => {
+    const headers = [
+      "Vendor ID",
+      "Name",
+      "Type",
+      "Contact Person",
+      "Phone",
+      "Email",
+      "Address",
+      "Status"
+    ];
+    const csvRows = [
+      headers.join(","),
+      ...vendors.map((v) =>
+        [
+          v.vendor_id,
+          `"${v.name}"`,
+          `"${v.service_type}"`,
+          `"${v.contact_person || ''}"`,
+          `"${v.phone}"`,
+          `"${v.email || ''}"`,
+          `"${v.address || ''}"`,
+          v.status
+        ].join(",")
+      ),
+    ];
+    const csvContent = csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "vendors.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportCSV = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const csvText = evt.target.result;
+      const lines = csvText.split("\n");
+      let importedCount = 0;
+      let errorsCount = 0;
+      const promises = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line) {
+          const cols = line.split(",").map(c => c.replace(/^"|"$/g, "").trim());
+          if (cols.length >= 5) {
+            const vendorName = cols[1];
+            const serviceType = cols[2];
+            const contactPerson = cols[3];
+            const phone = cols[4];
+            const email = cols[5] || "";
+            const address = cols[6] || "";
+            const status = cols[7] || "Active";
+
+            if (!vendorName) {
+              errorsCount++;
+              continue;
+            }
+
+            const payload = {
+              name: vendorName,
+              service_type: serviceType || "Maintenance",
+              contact_person: contactPerson,
+              phone: phone,
+              email: email || null,
+              address: address,
+              status: status
+            };
+
+            promises.push(
+              api.post("/vendors/?import=true", payload)
+                .then(() => { importedCount++; })
+                .catch((err) => {
+                  console.error("Error importing row:", err);
+                  errorsCount++;
+                })
+            );
+          }
+        }
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+        fetchVendors();
+        alert(`Import complete! ${importedCount} vendors imported successfully. ${errorsCount} failed/skipped.`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
   };
 
   const [showModal, setShowModal] = useState(false);
@@ -57,7 +158,7 @@ export default function VendorManagement() {
   };
 
   const filteredVendors = vendors.filter((v) =>
-    String(v.name || "").toLowerCase().includes(search.toLowerCase())
+    String(v.name || "").toLowerCase().includes(search.trim().toLowerCase())
   );
 
   // PAGINATED vendors
@@ -91,12 +192,14 @@ export default function VendorManagement() {
   };
 
   const handleSaveVendor = async () => {
+    if (saving) return;
     const errors = validateVendor(newVendor);
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
     }
     setFormErrors({});
+    setSaving(true);
 
     // Clean payload for Django
     const payload = { ...newVendor };
@@ -105,16 +208,9 @@ export default function VendorManagement() {
 
     try {
       if (editVendorId) {
-        const res = await api.put(`/vendors/${editVendorId}/`, payload);
-        setVendors(
-          vendors.map((v) => (v.vendor_id === editVendorId ? res.data : v))
-        );
+        await api.put(`/vendors/${editVendorId}/`, payload);
       } else {
-        const res = await api.post("/vendors/", payload);
-        setVendors([
-          ...vendors,
-          res.data,
-        ]);
+        await api.post("/vendors/", payload);
       }
 
       setNewVendor({
@@ -128,8 +224,15 @@ export default function VendorManagement() {
       });
       setEditVendorId(null);
       setShowModal(false);
+      fetchVendors(); // Refresh full state and update dashboard KPI instantly
     } catch (error) {
       console.error("Error saving vendor:", error);
+      if (error.response && error.response.data) {
+        // Map backend validation errors to frontend error state
+        setFormErrors(error.response.data);
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -143,8 +246,8 @@ export default function VendorManagement() {
   const handleDelete = async (id) => {
     try {
       await api.delete(`/vendors/${id}/`);
-      setVendors(vendors.filter((v) => v.vendor_id !== id));
       setShowDelete(null);
+      fetchVendors(); // Refresh full state and update dashboard KPI instantly
     } catch (error) {
       console.error("Error deleting vendor:", error);
     }
@@ -155,12 +258,8 @@ export default function VendorManagement() {
     if(!vendor) return;
     const updatedStatus = vendor.status === "Active" ? "Inactive" : "Active";
     try {
-      const res = await api.patch(`/vendors/${id}/`, { status: updatedStatus });
-      setVendors(
-        vendors.map((v) =>
-          v.vendor_id === id ? res.data : v
-        )
-      );
+      await api.patch(`/vendors/${id}/`, { status: updatedStatus });
+      fetchVendors(); // Refresh full state and update dashboard KPI instantly
     } catch (error) {
       console.error("Error updating status:", error);
     }
@@ -173,12 +272,52 @@ export default function VendorManagement() {
           <h2 className="text-2xl font-bold text-slate-900">Vendor Management</h2>
           <p className="text-slate-500 text-sm mt-1">Manage your suppliers and service providers</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-indigo-600 text-white px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-sm hover:bg-indigo-700 transition-colors mt-3 sm:mt-0 font-medium text-sm"
-        >
-          <Plus size={18} /> Add Vendor
-        </button>
+        <div className="flex flex-wrap items-center gap-3 mt-3 sm:mt-0 w-full sm:w-auto">
+          {userRole !== 'Vendor' && (
+            <>
+              <button
+                onClick={handleExportCSV}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 h-11 rounded-lg flex items-center gap-2 shadow-sm transition-colors font-medium text-sm cursor-pointer whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-lg">download</span> Export CSV
+              </button>
+              <button
+                onClick={() => document.getElementById('import-csv-file').click()}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 h-11 rounded-lg flex items-center gap-2 shadow-sm transition-colors font-medium text-sm cursor-pointer whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-lg">upload</span> Import CSV
+              </button>
+              <input
+                type="file"
+                accept=".csv"
+                id="import-csv-file"
+                onChange={handleImportCSV}
+                className="hidden"
+              />
+            </>
+          )}
+          {userRole !== 'Vendor' && (
+            <button
+              onClick={() => {
+                setNewVendor({
+                  name: "",
+                  service_type: "",
+                  contact_person: "",
+                  phone: "",
+                  address: "",
+                  email: "",
+                  status: "Active",
+                });
+                setEditVendorId(null);
+                setFormErrors({});
+                setShowModal(true);
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 h-11 rounded-lg flex items-center gap-2 shadow-sm transition-colors font-medium text-sm cursor-pointer whitespace-nowrap"
+            >
+              <Plus size={18} /> Add Vendor
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -246,64 +385,76 @@ export default function VendorManagement() {
           <table className="w-full text-left text-sm border-collapse">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="py-4 px-6 font-semibold text-slate-500">Name</th>
-                <th className="py-4 px-6 font-semibold text-slate-500">Type</th>
-                <th className="py-4 px-6 font-semibold text-slate-500">Contact Person</th>
-                <th className="py-4 px-6 font-semibold text-slate-500">Phone</th>
-                <th className="py-4 px-6 font-semibold text-slate-500">GST Number</th>
-                <th className="py-4 px-6 font-semibold text-slate-500">Status</th>
-                <th className="py-4 px-6 font-semibold text-slate-500 text-right">Actions</th>
+                <th className="py-4 px-6 font-semibold text-slate-500 whitespace-nowrap">Name</th>
+                <th className="py-4 px-6 font-semibold text-slate-500 whitespace-nowrap">Type</th>
+                <th className="py-4 px-6 font-semibold text-slate-500 whitespace-nowrap">Contact Person</th>
+                <th className="py-4 px-6 font-semibold text-slate-500 whitespace-nowrap">Phone</th>
+                <th className="py-4 px-6 font-semibold text-slate-500 whitespace-nowrap">Email</th>
+                <th className="py-4 px-6 font-semibold text-slate-500 whitespace-nowrap">Status</th>
+                {userRole !== 'Vendor' && <th className="py-4 px-6 font-semibold text-slate-500 text-right whitespace-nowrap">Actions</th>}
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100">
               {paginatedVendors.map((v) => (
                 <tr key={v.vendor_id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-4 px-6 font-medium text-slate-900">{v.name}</td>
-                  <td className="py-4 px-6 text-slate-600">{v.service_type}</td>
-                  <td className="py-4 px-6 text-slate-600">{v.contact_person}</td>
-                  <td className="py-4 px-6 text-slate-600">{v.phone}</td>
-                  <td className="py-4 px-6 text-slate-600 font-mono text-xs">{v.email || "-"}</td>
+                  <td className="py-4 px-6 font-medium text-slate-900 whitespace-nowrap">{v.name}</td>
+                  <td className="py-4 px-6 text-slate-600 whitespace-nowrap">{v.service_type}</td>
+                  <td className="py-4 px-6 text-slate-600 whitespace-nowrap">{v.contact_person}</td>
+                  <td className="py-4 px-6 text-slate-600 whitespace-nowrap">{v.phone}</td>
+                  <td className="py-4 px-6 text-slate-600 font-mono text-xs whitespace-nowrap">{v.email || "-"}</td>
 
-                  <td className="py-4 px-6">
-                    <button
-                      onClick={() => toggleStatus(v.vendor_id)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  <td className="py-4 px-6 whitespace-nowrap">
+                    {userRole === 'Vendor' ? (
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
                         v.status === "Active"
-                          ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                          : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                      }`}
-                    >
-                      {v.status === "Active" ? (
-                        <>
-                          <CheckCircle size={12} /> Active
-                        </>
-                      ) : (
-                        <>
-                          <XCircle size={12} /> Inactive
-                        </>
-                      )}
-                    </button>
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : "bg-red-50 text-red-700 border-red-200"
+                      }`}>
+                        {v.status === "Active" ? <CheckCircle size={12} /> : <XCircle size={12} />} {v.status}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => toggleStatus(v.vendor_id)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                          v.status === "Active"
+                            ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                            : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                        }`}
+                      >
+                        {v.status === "Active" ? (
+                          <>
+                            <CheckCircle size={12} /> Active
+                          </>
+                        ) : (
+                          <>
+                            <XCircle size={12} /> Inactive
+                          </>
+                        )}
+                      </button>
+                    )}
                   </td>
 
-                  <td className="py-4 px-6 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleEdit(v)}
-                        className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors"
-                        title="Edit"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => setShowDelete(v.vendor_id)}
-                        className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+                  {userRole !== 'Vendor' && (
+                    <td className="py-4 px-6 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEdit(v)}
+                          className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => setShowDelete(v.vendor_id)}
+                          className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -445,9 +596,10 @@ export default function VendorManagement() {
 
               <button
                 onClick={handleSaveVendor}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm transition-colors"
+                disabled={saving}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {editVendorId ? "Save Changes" : "Add Vendor"}
+                {saving ? "Saving..." : (editVendorId ? "Save Changes" : "Add Vendor")}
               </button>
             </div>
           </div>

@@ -25,9 +25,52 @@ class FinanceTransactionViewSet(viewsets.ModelViewSet):
     serializer_class = FinanceTransactionSerializer
 
 
+import logging
+import os
+
+log_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'audit.log')
+audit_logger = logging.getLogger('audit')
+audit_logger.setLevel(logging.INFO)
+
+if not audit_logger.handlers:
+    fh = logging.FileHandler(log_file_path)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    audit_logger.addHandler(fh)
+
+def log_audit_event(message):
+    audit_logger.info(message)
+
 class VendorViewSet(viewsets.ModelViewSet):
-    queryset = Vendor.objects.all().order_by('-pk')[:300]
+    queryset = Vendor.objects.all().order_by('-pk')
     serializer_class = VendorSerializer
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        is_import = self.request.query_params.get('import') == 'true'
+        if is_import:
+            log_audit_event(f"Bulk import vendor created: {instance.name} (ID: {instance.vendor_id})")
+        else:
+            log_audit_event(f"Vendor created: {instance.name} (ID: {instance.vendor_id})")
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_audit_event(f"Vendor updated: {instance.name} (ID: {instance.vendor_id})")
+
+    def perform_destroy(self, instance):
+        vendor_id = instance.vendor_id
+        name = instance.name
+        email = instance.email
+        
+        # Delete Django auth user if they exist
+        from django.contrib.auth.models import User
+        user_qs = User.objects.filter(username=name)
+        if email:
+            user_qs = user_qs | User.objects.filter(email=email)
+        user_qs.delete()
+        
+        instance.delete()
+        log_audit_event(f"Vendor deleted: {name} (ID: {vendor_id})")
 
 class InventoryViewSet(viewsets.ModelViewSet):
     queryset = Inventory.objects.all().order_by('-pk')[:300]
@@ -66,6 +109,37 @@ def dashboard_summary(request):
         trip_qs = Trip.objects.none()
         vehicle_qs = Vehicle.objects.none()
 
+    # Helper for formatting Indian currency
+    def format_indian_currency(amount):
+        try:
+            amount = float(amount)
+        except (ValueError, TypeError):
+            return f"₹{amount}"
+        
+        s = f"{amount:.2f}"
+        parts = s.split('.')
+        num = parts[0]
+        dec = parts[1] if len(parts) > 1 else '00'
+        
+        is_negative = num.startswith('-')
+        if is_negative:
+            num = num[1:]
+            
+        if len(num) <= 3:
+            res = num
+        else:
+            last_three = num[-3:]
+            remaining = num[:-3]
+            groups = []
+            while len(remaining) > 0:
+                groups.append(remaining[-2:])
+                remaining = remaining[:-2]
+            groups.reverse()
+            res = ",".join(groups) + "," + last_three
+            
+        prefix = "-₹" if is_negative else "₹"
+        return f"{prefix}{res}.{dec}"
+
     # 1. KPIs
     active_trips_count = trip_qs.filter(status__in=['In Progress', 'Running']).count()
     available_vehicles_count = vehicle_qs.filter(status='Available').count()
@@ -103,12 +177,12 @@ def dashboard_summary(request):
         },
         {
             'title': 'Pending Payments',
-            'value': f"₹{pending_payments}",
+            'value': format_indian_currency(pending_payments),
             'change': '-0%', 'trend': 'down', 'icon': 'payments', 'iconBg': 'bg-orange-500/10', 'iconColor': 'text-orange-500', 'status': 'warning'
         },
         {
             'title': 'Monthly Profit',
-            'value': f"₹{monthly_profit}",
+            'value': format_indian_currency(monthly_profit),
             'change': '+0%', 'trend': 'up', 'icon': 'trending_up', 'iconBg': 'bg-green-500/10', 'iconColor': 'text-green-500', 'status': 'good'
         }
     ]
@@ -139,23 +213,30 @@ def dashboard_summary(request):
             'driver': t.driver.name if t.driver else 'Unassigned',
             'route': f"{t.start_location} → {t.end_location}",
             'status': t.status,
-            'profit': f"₹{t.distance * 10}", 
+            'profit': format_indian_currency(t.distance * 10), 
             'statusColor': color
         })
 
-    # 4. Expense Breakdown
-    expenses_by_cat = finance_qs.filter(type='Expense').values('category').annotate(total=Sum('amount')).order_by('-total')[:5]
-    total_exp_all = sum([x['total'] for x in expenses_by_cat]) or 1
+    # 4. Expense Breakdown (Group and normalize category names to resolve misspelling)
+    expenses_raw = finance_qs.filter(type='Expense').values('category').annotate(total=Sum('amount'))
+    expenses_dict = {}
+    for x in expenses_raw:
+        cat = x['category'] or 'Others'
+        # Normalize category names to handle misspelling
+        if cat.strip().lower().replace(' ', '') in ['freightexpence', 'freightexpense']:
+            cat = 'Freight Expense'
+        expenses_dict[cat] = expenses_dict.get(cat, 0) + float(x['total'])
+        
+    sorted_expenses = sorted(expenses_dict.items(), key=lambda x: x[1], reverse=True)[:5]
+    total_exp_all = sum(expenses_dict.values()) or 1
     
     expenseBreakdown = []
     colors = ['from-red-500 to-red-400', 'from-blue-500 to-blue-400', 'from-yellow-500 to-yellow-400', 'from-green-500 to-green-400', 'from-purple-500 to-purple-400']
-    for idx, e in enumerate(expenses_by_cat):
-        cat = e['category'] or 'Others'
-        amt = e['total']
+    for idx, (cat, amt) in enumerate(sorted_expenses):
         pct = round((amt / total_exp_all) * 100)
         expenseBreakdown.append({
             'category': cat,
-            'amount': f"₹{amt}",
+            'amount': format_indian_currency(amt),
             'percentage': pct,
             'color': colors[idx % len(colors)]
         })
@@ -210,7 +291,7 @@ def dashboard_summary(request):
             })
         else:
             activityLog.append({
-                'message': f"New {obj.type} of ₹{obj.amount} recorded",
+                'message': f"New {obj.type} of {format_indian_currency(obj.amount)} recorded",
                 'time': obj.added_date.strftime("%b %d, %I:%M %p") if getattr(obj, 'added_date', None) else "Recently",
                 'icon': 'payments',
                 'iconColor': 'text-green-500' if obj.type == 'Income' else 'text-red-500',
@@ -222,7 +303,7 @@ def dashboard_summary(request):
     for p in pending_large:
         notifications.append({
             'title': 'High Pending Payment',
-            'message': f"Pending {p.type} of ₹{p.amount} requires attention.",
+            'message': f"Pending {p.type} of {format_indian_currency(p.amount)} requires attention.",
             'severity': 'high',
             'time': p.added_date.strftime("%b %d, %I:%M %p") if getattr(p, 'added_date', None) else "Recently",
         })
@@ -293,6 +374,7 @@ def admin_login(request):
         login(request, user)
         # Handle existing users that might not have a UserProfile
         profile, created = UserProfile.objects.get_or_create(user=user, defaults={'role': 'Admin'})
+        log_audit_event(f"Successful login for user: {username}")
         return Response({
             'message': 'Login successful',
             'username': user.username,
@@ -300,4 +382,5 @@ def admin_login(request):
             'role': profile.role
         })
     else:
+        log_audit_event(f"Failed login attempt for user: {username}")
         return Response({'error': 'Invalid credentials'}, status=401)

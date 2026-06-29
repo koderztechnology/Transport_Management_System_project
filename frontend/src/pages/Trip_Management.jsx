@@ -463,29 +463,51 @@ const TripManagement = () => {
         {/* Left Column: List & Filters */}
         <div className="lg:col-span-2 space-y-6">
           {/* Filters */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col sm:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
                 search
               </span>
               <input
                 type="text"
-                placeholder="Search trips..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                placeholder="Search by start/end location, vehicle, driver..."
+                className="w-full pl-10 pr-10 py-2 h-11 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              )}
             </div>
-            <select
-              className="select select-bordered w-full sm:w-48 pl-4 pr-10 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="All">All Status</option>
-              <option value="Scheduled">Scheduled</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
-            </select>
+            <div className="flex gap-2 w-full sm:w-auto items-center">
+              <select
+                className="select select-bordered w-full sm:w-48 pl-4 pr-10 py-2 h-11 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="All">All Status</option>
+                <option value="Scheduled">Scheduled</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+              </select>
+              {(statusFilter !== "All" || searchTerm !== "") && (
+                <button
+                  onClick={() => {
+                    setStatusFilter("All");
+                    setSearchTerm("");
+                  }}
+                  className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                >
+                  <span className="material-symbols-outlined text-base">filter_alt_off</span>
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Trips List */}

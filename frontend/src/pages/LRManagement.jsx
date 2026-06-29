@@ -335,35 +335,57 @@ export default function LRManagement() {
       {/* Main Table Card */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {/* Search & Filters */}
-        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white">
+        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white w-full">
           <div className="relative flex-1 w-full max-w-md">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
               search
             </span>
             <input
               type="text"
-              placeholder="Search LR number, consignor, consignee, route..."
+              placeholder="Search by LR number, consignor, consignee, or route..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+              className="w-full pl-10 pr-10 py-2 h-11 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            )}
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-48 pl-4 pr-10 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
-          >
-            <option value="All">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="in-transit">In-Transit</option>
-            <option value="billed">Billed</option>
-          </select>
+          <div className="flex gap-2 w-full sm:w-auto items-center">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full sm:w-48 pl-4 pr-10 py-2 h-11 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
+            >
+              <option value="All">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="in-transit">In-Transit</option>
+              <option value="billed">Billed</option>
+            </select>
+            {(statusFilter !== "All" || searchQuery !== "") && (
+              <button
+                onClick={() => {
+                  setStatusFilter("All");
+                  setSearchQuery("");
+                }}
+                className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-base">filter_alt_off</span>
+                Reset
+              </button>
+            )}
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -391,7 +413,7 @@ export default function LRManagement() {
                     </div>
                   </td>
                   <td className="py-4 px-6 text-sm text-slate-600">{row.date}</td>
-                  <td className="py-4 px-6 text-sm text-slate-600">{row.route}</td>
+                  <td className="py-4 px-6 text-sm text-slate-600 max-w-[150px] truncate" title={row.route}>{row.route}</td>
                   <td className="py-4 px-6 text-sm text-slate-600">
                     {vehicles.find(v => String(v.vehicle_id) === String(row.vehicle))?.vehicle_number || row.vehicle}
                   </td>

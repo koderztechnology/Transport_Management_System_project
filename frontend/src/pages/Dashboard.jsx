@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
@@ -9,8 +9,43 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [timeframe, setTimeframe] = useState('This Month');
+  const [notifications, setNotifications] = useState([]);
+
   const userRole = localStorage.getItem('user_role') || 'Admin';
   const username = localStorage.getItem('admin_username') || '';
+
+  useEffect(() => {
+    if (dashboardData) {
+      setNotifications(dashboardData.notifications || []);
+    }
+  }, [dashboardData]);
+
+  const handleMarkAllRead = () => {
+    setNotifications([]);
+  };
+
+  const formatChartValue = (value) => {
+    if (value === 0) return '₹0';
+    const absValue = Math.abs(value);
+    if (absValue >= 10000000) { // Crore
+      return `₹${(value / 10000000).toFixed(2)} Cr`;
+    } else if (absValue >= 100000) { // Lakh
+      return `₹${(value / 100000).toFixed(2)} L`;
+    } else if (absValue >= 1000) { // Thousand
+      return `₹${(value / 1000).toFixed(1)}K`;
+    }
+    return `₹${value}`;
+  };
+
+  const formatIndianCurrency = (amount) => {
+    const num = parseFloat(amount);
+    if (isNaN(num)) return amount;
+    return '₹' + num.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -40,10 +75,38 @@ const Dashboard = () => {
   // Financial Data
   const monthlyFinancial = dashboardData?.monthlyFinancial || [];
 
+  const displayFinancialData = (() => {
+    if (!monthlyFinancial.length) return [];
+    if (timeframe === 'This Month') {
+      return [monthlyFinancial[monthlyFinancial.length - 1]];
+    }
+    if (timeframe === 'Last Month') {
+      return monthlyFinancial.length > 1 ? [monthlyFinancial[monthlyFinancial.length - 2]] : [];
+    }
+    return monthlyFinancial; // YTD shows all
+  })();
+
   const topCostHeads = dashboardData?.topCostHeads || [];
 
   // Expense Breakdown
   const expenseBreakdown = dashboardData?.expenseBreakdown || [];
+
+  const getHexColor = (colorStr) => {
+    if (colorStr.includes('red-500')) return '#ef4444';
+    if (colorStr.includes('blue-500')) return '#3b82f6';
+    if (colorStr.includes('yellow-500')) return '#eab308';
+    if (colorStr.includes('green-500')) return '#10b981';
+    if (colorStr.includes('purple-500')) return '#a855f7';
+    return '#6366f1';
+  };
+
+  const pieData = (expenseBreakdown || []).map(e => ({
+    name: e.category,
+    value: parseFloat(e.amount.replace(/[₹,]/g, '')) || 0,
+    color: e.color
+  }));
+
+  const totalExpensesSum = pieData.reduce((sum, item) => sum + item.value, 0);
 
   // Activity Log
   const activityLog = dashboardData?.activityLog || [];
@@ -78,7 +141,11 @@ const Dashboard = () => {
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Dashboard Overview
+            {userRole === 'Admin' ? 'Admin Dashboard' :
+             userRole === 'Vendor' ? 'Vendor Portal' :
+             userRole === 'Driver' ? 'Driver Dashboard' :
+             userRole === 'Manager' ? 'Manager Dashboard' :
+             `${userRole} Dashboard`}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             Monitor your transportation management system
@@ -217,7 +284,7 @@ const Dashboard = () => {
                       <td className="p-3 text-sm font-medium text-indigo-600">{trip.tripId}</td>
                       <td className="p-3 text-sm text-slate-700">{trip.vehicle}</td>
                       <td className="p-3 text-sm text-slate-700">{trip.driver}</td>
-                      <td className="p-3 text-sm text-slate-700">{trip.route}</td>
+                      <td className="p-3 text-sm text-slate-700 max-w-[150px] truncate" title={trip.route}>{trip.route}</td>
                       <td className="p-3">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${trip.statusColor}`}>
                           {trip.status}
@@ -241,11 +308,34 @@ const Dashboard = () => {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Financial Overview</h3>
               <div className="flex gap-2">
-                <button className="px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">This Month</button>
-                <button className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                <button
+                  onClick={() => setTimeframe('This Month')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                    timeframe === 'This Month'
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  This Month
+                </button>
+                <button
+                  onClick={() => setTimeframe('Last Month')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                    timeframe === 'Last Month'
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
                   Last Month
                 </button>
-                <button className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                <button
+                  onClick={() => setTimeframe('YTD')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                    timeframe === 'YTD'
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
                   YTD
                 </button>
               </div>
@@ -253,7 +343,7 @@ const Dashboard = () => {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
                 <BarChart
-                  data={monthlyFinancial}
+                  data={displayFinancialData}
                   margin={{
                     top: 20,
                     right: 30,
@@ -271,7 +361,7 @@ const Dashboard = () => {
                   <YAxis 
                     tick={{ fontSize: 12, fill: '#64748b' }}
                     axisLine={{ stroke: '#e2e8f0' }}
-                    tickFormatter={(value) => `₹${(value / 100).toFixed(0)}K`}
+                    tickFormatter={formatChartValue}
                   />
                   <Tooltip 
                     contentStyle={{
@@ -281,8 +371,8 @@ const Dashboard = () => {
                       color: '#fff'
                     }}
                     formatter={(value, name) => [
-                      `₹${(value / 100).toFixed(0)}K`, 
-                      name === 'income' ? 'Income' : 'Expenses'
+                      formatChartValue(value), 
+                      name
                     ]}
                     labelStyle={{ color: '#94a3b8' }}
                   />
@@ -298,6 +388,7 @@ const Dashboard = () => {
                     name="Income"
                     radius={[4, 4, 0, 0]}
                     maxBarSize={60}
+                    minPointSize={5}
                   />
                   <Bar 
                     dataKey="expenses" 
@@ -305,6 +396,7 @@ const Dashboard = () => {
                     name="Expenses"
                     radius={[4, 4, 0, 0]}
                     maxBarSize={60}
+                    minPointSize={5}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -317,62 +409,31 @@ const Dashboard = () => {
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               {/* Donut Chart */}
               <div className="relative w-48 h-48">
-                <svg viewBox="0 0 100 100" className="transform -rotate-90">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="35"
-                    fill="none"
-                    stroke="#ef4444"
-                    strokeWidth="15"
-                    strokeDasharray="77 220"
-                    strokeDashoffset="0"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="35"
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="15"
-                    strokeDasharray="37 220"
-                    strokeDashoffset="-77"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="35"
-                    fill="none"
-                    stroke="#eab308"
-                    strokeWidth="15"
-                    strokeDasharray="44 220"
-                    strokeDashoffset="-114"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="35"
-                    fill="none"
-                    stroke="#10b981"
-                    strokeWidth="15"
-                    strokeDasharray="31 220"
-                    strokeDashoffset="-158"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="35"
-                    fill="none"
-                    stroke="#a855f7"
-                    strokeWidth="15"
-                    strokeDasharray="31 220"
-                    strokeDashoffset="-189"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={getHexColor(entry.color)} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value) => [formatIndianCurrency(value), 'Amount']}
+                      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-slate-900">₹9.0L</p>
-                    <p className="text-xs text-slate-600">Total</p>
+                    <p className="text-sm font-bold text-slate-900 truncate max-w-[110px]">{formatChartValue(totalExpensesSum)}</p>
+                    <p className="text-[10px] text-slate-500 uppercase font-medium">Total</p>
                   </div>
                 </div>
               </div>

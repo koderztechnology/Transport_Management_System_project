@@ -23,13 +23,57 @@ import {
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Custom truck icon
-const truckIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/1995/1995574.png",
-  iconSize: [35, 35],
-  iconAnchor: [17, 34],
-  popupAnchor: [0, -30],
-});
+// Custom SVG icon generator for vehicle status markers
+const createVehicleMarker = (status) => {
+  const colorMap = {
+    Active: '#10b981',      // Green
+    'In Transit': '#f59e0b', // Amber/Orange
+    'In Trip': '#3b82f6',    // Blue
+    Available: '#10b981',    // Green
+    Maintenance: '#ef4444',  // Red
+    'Under Maintenance': '#ef4444', // Red
+    Idle: '#64748b'          // Slate
+  };
+  const color = colorMap[status] || '#6366f1';
+  
+  return L.divIcon({
+    html: `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background-color: ${color};
+        border: 2px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      ">
+        <span class="material-symbols-outlined" style="color: white; font-size: 18px; font-weight: bold;">local_shipping</span>
+      </div>
+    `,
+    className: 'custom-vehicle-marker',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+  });
+};
+
+// Jitter location helper to prevent exact overlaps
+const jitterLocation = (lat, lng, index, array) => {
+  let duplicateCount = 0;
+  for (let i = 0; i < index; i++) {
+    if (array[i].location && Math.abs(array[i].location[0] - lat) < 0.0001 && Math.abs(array[i].location[1] - lng) < 0.0001) {
+      duplicateCount++;
+    }
+  }
+  if (duplicateCount > 0) {
+    const angle = (duplicateCount * 137.5) * (Math.PI / 180);
+    const r = 0.00025 * Math.sqrt(duplicateCount);
+    return [lat + r * Math.cos(angle), lng + r * Math.sin(angle)];
+  }
+  return [lat, lng];
+};
 
 // 🚛 Fleet data
 const FLEET = [
@@ -228,31 +272,31 @@ export default function FleetDashboard() {
 
   const handleExportReport = () => {
     const headers = ["Vehicle ID", "Registration Number", "Type", "Capacity", "Driver", "Status", "Last Service", "Fuel Efficiency"];
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [
-        headers.join(","),
-        ...filtered.map((v) =>
-          [
-            v.id,
-            v.reg,
-            v.type,
-            v.capacity,
-            `"${v.driver}"`,
-            v.status,
-            v.lastService,
-            v.fuelEfficiency
-          ].join(",")
-        ),
-      ].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
+    const csvRows = [
+      headers.join(","),
+      ...filtered.map((v) =>
+        [
+          v.id,
+          v.reg,
+          v.type,
+          v.capacity,
+          `"${v.driver}"`,
+          v.status,
+          v.lastService,
+          v.status === 'Maintenance' ? 'N/A' : v.fuelEfficiency
+        ].join(",")
+      ),
+    ];
+    const csvContent = csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", "fleet_report.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleFormChange = (e) => {
@@ -473,7 +517,7 @@ export default function FleetDashboard() {
                 Live Tracking
               </h2>
             </div>
-            <div className="flex-1 min-h-[400px] lg:min-h-0 p-1">
+            <div className="flex-1 min-h-[400px] lg:min-h-0 p-1 relative">
               <MapContainer
                 center={[18.5204, 73.8567]}
                 zoom={6}
@@ -483,8 +527,8 @@ export default function FleetDashboard() {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution="© OpenStreetMap contributors"
                 />
-                {filtered.map((v) => (
-                  <Marker key={v.id} position={v.location} icon={truckIcon}>
+                {filtered.map((v, index) => (
+                  <Marker key={v.id} position={jitterLocation(v.location[0], v.location[1], index, filtered)} icon={createVehicleMarker(v.status)}>
                     <Popup>
                       <div className="text-sm font-sans">
                         <strong className="block text-slate-800 mb-1">{v.reg}</strong>
@@ -497,6 +541,26 @@ export default function FleetDashboard() {
                   </Marker>
                 ))}
               </MapContainer>
+              {/* Legend overlay */}
+              <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-md border border-slate-200 z-[1000] text-xs space-y-2">
+                <p className="font-semibold text-slate-800 border-b pb-1 mb-1">Vehicle Status Legend</p>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#10b981]"></span>
+                  <span className="text-slate-600 font-medium">Available / Active</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#f59e0b]"></span>
+                  <span className="text-slate-600 font-medium">In Transit</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#ef4444]"></span>
+                  <span className="text-slate-600 font-medium">Under Maintenance</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#64748b]"></span>
+                  <span className="text-slate-600 font-medium">Idle</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -516,22 +580,30 @@ export default function FleetDashboard() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
-              <div className="flex-1 relative">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4 items-center">
+              <div className="flex-1 w-full relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
                   search
                 </span>
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search vehicle ID, reg or driver..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  placeholder="Search by Vehicle ID, Registration Number, or Driver Name..."
+                  className="w-full pl-10 pr-10 py-2.5 h-11 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-lg">close</span>
+                  </button>
+                )}
               </div>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="pl-4 pr-10 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="px-4 pr-10 py-2.5 h-11 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
                 <option value="All">All Status</option>
                 <option value="Active">Active</option>
@@ -539,6 +611,18 @@ export default function FleetDashboard() {
                 <option value="Maintenance">Maintenance</option>
                 <option value="Idle">Idle</option>
               </select>
+              {(statusFilter !== "All" || query !== "") && (
+                <button
+                  onClick={() => {
+                    setStatusFilter("All");
+                    setQuery("");
+                  }}
+                  className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                >
+                  <span className="material-symbols-outlined text-base">filter_alt_off</span>
+                  Reset Filters
+                </button>
+              )}
             </div>
           </div>
 
@@ -561,9 +645,11 @@ export default function FleetDashboard() {
                       onClick={() => handleSort(col.key)}
                       className="px-5 py-3 text-left text-xs font-semibold text-slate-700 uppercase cursor-pointer hover:bg-slate-100 transition-colors"
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
                         {col.label}
-                        <span className="material-symbols-outlined text-base">unfold_more</span>
+                        <span className="material-symbols-outlined text-slate-400 text-sm">
+                          {sortKey === col.key ? (sortAsc ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
+                        </span>
                       </div>
                     </th>
                   ))}
@@ -572,8 +658,18 @@ export default function FleetDashboard() {
               <tbody className="divide-y divide-slate-100">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-5 py-8 text-center text-slate-500">
-                      No vehicles found matching your criteria.
+                    <td colSpan="7" className="px-5 py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <span className="material-symbols-outlined text-4xl text-slate-300">local_shipping</span>
+                        <p className="font-medium text-slate-700">No vehicles found matching the search or filter criteria.</p>
+                        <button
+                          type="button"
+                          onClick={() => { setQuery(""); setStatusFilter("All"); }}
+                          className="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-semibold cursor-pointer"
+                        >
+                          Reset Filters
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -584,7 +680,7 @@ export default function FleetDashboard() {
                     >
                       <td className="px-5 py-4 text-sm font-medium text-slate-900">
                         {v.id}
-                        <div className="text-xs text-slate-500 font-normal">{v.reg}</div>
+                        <div className="text-xs text-slate-700 font-normal">{v.reg}</div>
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-700">
                         <div className="flex items-center gap-2">
@@ -604,7 +700,7 @@ export default function FleetDashboard() {
                         <StatusBadge status={v.status} />
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-700">
-                        {v.fuelEfficiency ? `${v.fuelEfficiency}` : "—"}
+                        {v.status === 'Maintenance' ? 'N/A' : (v.fuelEfficiency ? `${v.fuelEfficiency}` : 'N/A')}
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-700">
                         {v.lastService}

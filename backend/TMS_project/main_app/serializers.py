@@ -68,6 +68,30 @@ class VendorSerializer(serializers.ModelSerializer):
         model = Vendor
         fields = '__all__'
 
+    def validate_name(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Vendor name is required.")
+        return value.strip()
+
+    def validate(self, data):
+        name = data.get('name')
+        if name:
+            name_clean = name.strip()
+            # unique case-insensitive check
+            qs = Vendor.objects.filter(name__iexact=name_clean)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({"name": "A vendor with this name already exists."})
+        
+        email = data.get('email')
+        if email:
+            import re
+            if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+                raise serializers.ValidationError({"email": "Please enter a valid email address."})
+                
+        return data
+
 class InventorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Inventory

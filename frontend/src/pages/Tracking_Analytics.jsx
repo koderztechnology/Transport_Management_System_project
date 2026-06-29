@@ -27,12 +27,57 @@ import "leaflet/dist/leaflet.css";
   - For production, replace polling with WebSocket or server-sent events for real realtime.
 */
 
-const truckIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/1995/1995574.png",
-  iconSize: [36, 36],
-  iconAnchor: [18, 36],
-  popupAnchor: [0, -28],
-});
+// Custom SVG icon generator for vehicle status markers
+const createVehicleMarker = (status) => {
+  const colorMap = {
+    Active: '#10b981',      // Green
+    'In Transit': '#f59e0b', // Amber/Orange
+    'In Trip': '#3b82f6',    // Blue
+    Available: '#10b981',    // Green
+    Maintenance: '#ef4444',  // Red
+    'Under Maintenance': '#ef4444', // Red
+    Idle: '#64748b'          // Slate
+  };
+  const color = colorMap[status] || '#6366f1';
+  
+  return L.divIcon({
+    html: `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background-color: ${color};
+        border: 2px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      ">
+        <span class="material-symbols-outlined" style="color: white; font-size: 18px; font-weight: bold;">local_shipping</span>
+      </div>
+    `,
+    className: 'custom-vehicle-marker',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+  });
+};
+
+// Jitter location helper to prevent exact overlaps
+const jitterLocation = (lat, lng, index, array) => {
+  let duplicateCount = 0;
+  for (let i = 0; i < index; i++) {
+    if (array[i].lat && Math.abs(array[i].lat - lat) < 0.0001 && Math.abs(array[i].lng - lng) < 0.0001) {
+      duplicateCount++;
+    }
+  }
+  if (duplicateCount > 0) {
+    const angle = (duplicateCount * 137.5) * (Math.PI / 180);
+    const r = 0.00025 * Math.sqrt(duplicateCount);
+    return [lat + r * Math.cos(angle), lng + r * Math.sin(angle)];
+  }
+  return [lat, lng];
+};
 
 // thresholds for alerts
 const OVERSPEED_KMPH = 80;
@@ -363,40 +408,62 @@ export default function TrackingAnalyticsFull() {
 
           {/* Tracking Tab */}
           {selectedTab === "tracking" && (
-            <div className="bg-white rounded-xl shadow p-4">
+            <div className="bg-white rounded-xl shadow p-4 relative">
               <h3 className="font-semibold mb-3">Live Map</h3>
-              <MapContainer
-                whenCreated={onMapCreated}
-                center={[19.076, 72.8777]}
-                zoom={6}
-                style={{ height: "520px", width: "100%" }}
-                className="rounded-lg"
-              >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                {vehicles.slice(0, 100).map((v) => (
-                  <Marker
-                    key={v.id}
-                    position={[v.lat, v.lng]}
-                    icon={truckIcon}
-                    eventHandlers={{
-                      click: () => {
-                        focusOnVehicle(v);
-                      },
-                    }}
-                  >
-                    <Popup>
-                      <div className="text-sm">
-                        <div className="font-semibold">{v.reg} ({v.id})</div>
-                        <div>Driver: {v.driver}</div>
-                        <div>Speed: {v.speed} km/h</div>
-                        <div>Fuel: {v.fuel}%</div>
-                        <div>Status: {v.status}</div>
-                        <div className="text-xs text-slate-400 mt-1">{new Date(v.lastSeen).toLocaleString()}</div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              <div className="relative">
+                <MapContainer
+                  whenCreated={onMapCreated}
+                  center={[19.076, 72.8777]}
+                  zoom={6}
+                  style={{ height: "520px", width: "100%" }}
+                  className="rounded-lg"
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  {vehicles.slice(0, 100).map((v, index) => (
+                    <Marker
+                      key={v.id}
+                      position={jitterLocation(v.lat, v.lng, index, vehicles)}
+                      icon={createVehicleMarker(v.status)}
+                      eventHandlers={{
+                        click: () => {
+                          focusOnVehicle(v);
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="text-sm">
+                          <div className="font-semibold">{v.reg} ({v.id})</div>
+                          <div>Driver: {v.driver}</div>
+                          <div>Speed: {v.speed} km/h</div>
+                          <div>Fuel: {v.fuel}%</div>
+                          <div>Status: {v.status}</div>
+                          <div className="text-xs text-slate-400 mt-1">{new Date(v.lastSeen).toLocaleString()}</div>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+                {/* Legend overlay */}
+                <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-md border border-slate-200 z-[1000] text-xs space-y-2">
+                  <p className="font-semibold text-slate-800 border-b pb-1 mb-1">Vehicle Status Legend</p>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#10b981]"></span>
+                    <span className="text-slate-600 font-medium">Available / Active</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#f59e0b]"></span>
+                    <span className="text-slate-600 font-medium">In Transit</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#ef4444]"></span>
+                    <span className="text-slate-600 font-medium">Under Maintenance</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#64748b]"></span>
+                    <span className="text-slate-600 font-medium">Idle</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
