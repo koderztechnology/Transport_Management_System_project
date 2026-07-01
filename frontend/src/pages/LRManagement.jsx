@@ -73,7 +73,7 @@ export default function LRManagement() {
         material: item.material || "",
         weight: item.weight || "",
         freight: item.freight || "",
-        eway: item.eway || "",
+        eway: item.eway_bill || "",
         status: item.status ? String(item.status).toLowerCase() : "pending"
       }));
       setLRData(mapped);
@@ -152,7 +152,7 @@ export default function LRManagement() {
         material: newBill.material,
         weight: newBill.weight,
         freight: newBill.freight,
-        eway: newBill.eway || null,
+        eway_bill: newBill.eway || null,
         status: newBill.status === "in-transit" ? "In-Transit" : newBill.status.charAt(0).toUpperCase() + newBill.status.slice(1)
       };
       await api.post("/lr-bilty/", payload);
@@ -189,7 +189,7 @@ export default function LRManagement() {
         material: updated.material,
         weight: updated.weight,
         freight: updated.freight,
-        eway: updated.eway || null,
+        eway_bill: updated.eway || null,
         status: updated.status === "in-transit" ? "In-Transit" : updated.status.charAt(0).toUpperCase() + updated.status.slice(1)
       };
       await api.put(`/lr-bilty/${updated.id}/`, payload);

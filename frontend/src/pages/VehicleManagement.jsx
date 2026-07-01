@@ -126,7 +126,6 @@ const VehicleManagement = () => {
     const gvwrValue = Number(formData.gvwr);
 
     if (!formData.vehicleNumber.trim()) errors.vehicleNumber = 'Vehicle number is required';
-    if (!formData.ownerName.trim()) errors.ownerName = 'Owner name is required';
     if (!formData.modelName.trim()) errors.modelName = 'Model name is required';
     if (!formData.manufacturingYear) {
       errors.manufacturingYear = 'Manufacturing year is required';

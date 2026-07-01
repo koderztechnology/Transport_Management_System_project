@@ -148,33 +148,34 @@ def seed():
         lr_bilties = list(LRBilty.objects.all())
 
     # 9. EWay Bills
-    if not EWayBill.objects.exists():
-        for i in range(5):
-            EWayBill.objects.create(
-                invoice_number=f"INV-2026-{200+i}", lr=lr_bilties[i],
-                supplier_name=f"Supplier Metal Corp {i+1}", supplier_gstin=f"07AAAAA0000A1Z{i}",
-                buyer_name=f"Buyer Auto Ltd {i+1}", buyer_gstin=f"27BBBBB1111B2Z{i}",
-                goods_description="Steel Sheets" if i%2==0 else "Engine Parts",
-                hsn_code=f"7208{i}", invoice_amount=str(150000 + i*50000),
-                vehicle=vehicles[i], route_from="Source City", route_to="Destination City",
-                estimated_days=3, driver=drivers[i], driver_phone=drivers[i].phone,
-                status="Active"
-            )
-        print("Created EWay Bills")
+    EWayBill.objects.all().delete()
+    for i in range(5):
+        EWayBill.objects.create(
+            invoice_number=f"INV-2026-{200+i}", lr=lr_bilties[i],
+            supplier_name=f"Supplier Metal Corp {i+1}", supplier_gstin=f"07AAAAA0000A1Z{i}",
+            buyer_name=f"Buyer Auto Ltd {i+1}", buyer_gstin=f"27BBBBB1111B2Z{i}",
+            goods_description="Steel Sheets" if i%2==0 else "Engine Parts",
+            hsn_code=f"7208{i}", invoice_amount=str(150000 + i*50000),
+            vehicle=vehicles[i], route_from="Source City", route_to="Destination City",
+            estimated_days=3, driver=drivers[i], driver_phone=drivers[i].phone,
+            status="Active"
+        )
+    print("Created EWay Bills")
 
     # 10. Finance Transactions
-    if not FinanceTransaction.objects.exists():
-        for i in range(10):
-            t_type = "Income" if i % 2 == 0 else "Expense"
-            cat = "Freight Income" if t_type == "Income" else ("Fuel" if i % 3 == 0 else "Toll")
-            desc = f"Received freight payment for LR-{10000+(i//2)}" if t_type == "Income" else f"Paid {cat} charge"
-            FinanceTransaction.objects.create(
-                date=date.today() - timedelta(days=i), type=t_type,
-                description=desc, amount=float(25000 - i*1500) if t_type == "Income" else float(5000 + i*500),
-                status="Completed", category=cat,
-                vehicle=vehicles[i%5], trip=trips[i%5], vendor=vendors[i%5]
-            )
-        print("Created Finance Transactions")
+    FinanceTransaction.objects.all().delete()
+    for i in range(10):
+        t_type = "Income" if i % 2 == 0 else "Expense"
+        cat = "Freight Income" if t_type == "Income" else ("Fuel" if i % 3 == 0 else "Toll")
+        desc = f"Received freight payment for LR-{10000+(i//2)}" if t_type == "Income" else f"Paid {cat} charge"
+        status = "Pending" if i in [3, 7] else "Completed"
+        FinanceTransaction.objects.create(
+            date=date.today(), type=t_type,
+            description=desc, amount=float(25000 - i*1500) if t_type == "Income" else float(5000 + i*500),
+            status=status, category=cat,
+            vehicle=vehicles[i%5], trip=trips[i%5], vendor=vendors[i%5]
+        )
+    print("Created Finance Transactions")
 
     # 11. Inventory
     if not Inventory.objects.exists():
