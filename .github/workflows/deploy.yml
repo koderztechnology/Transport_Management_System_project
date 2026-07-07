@@ -27,6 +27,7 @@ jobs:
             source /home/ubuntu/tms/backend/venv/bin/activate
             cd /home/ubuntu/tms/backend/TMS_project
             python manage.py collectstatic --noinput
+            python manage.py migrate --noinput
             
             cd /home/ubuntu/tms/frontend
             npm install
