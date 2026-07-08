@@ -1,0 +1,40 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/tms
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Restore server-specific settings
+            cd /home/ubuntu/tms/backend/TMS_project/TMS_project
+            sed -i 's/ALLOWED_HOSTS = .*/ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")/' settings.py
+
+            source /home/ubuntu/tms/backend/venv/bin/activate
+            cd /home/ubuntu/tms/backend/TMS_project
+            python manage.py collectstatic --noinput
+            python manage.py migrate --noinput
+            
+            cd /home/ubuntu/tms/frontend
+            npm install
+            npm run build
+            chmod -R 755 /home/ubuntu/tms/frontend/dist
+            
+            sudo systemctl restart tms-backend
+            sudo systemctl reload nginx
+            
+            echo "Deploy successful!"
