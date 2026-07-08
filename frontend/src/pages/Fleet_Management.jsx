@@ -23,6 +23,22 @@ import {
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
+const formatApiError = (err, defaultMsg) => {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    if (typeof data === 'object') {
+      return Object.entries(data)
+        .map(([field, msgs]) => {
+          const fieldName = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          return `${fieldName}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+        })
+        .join('\n');
+    }
+    if (typeof data === 'string') return data;
+  }
+  return err.message || defaultMsg;
+};
+
 // Custom SVG icon generator for vehicle status markers
 const createVehicleMarker = (status) => {
   const colorMap = {
@@ -35,6 +51,11 @@ const createVehicleMarker = (status) => {
     Idle: '#64748b'          // Slate
   };
   const color = colorMap[status] || '#6366f1';
+  const svgTruck = `
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
+      <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm2-6.5h-3V9h3v3z"/>
+    </svg>
+  `;
   
   return L.divIcon({
     html: `
@@ -49,7 +70,7 @@ const createVehicleMarker = (status) => {
         border-radius: 50%;
         box-shadow: 0 2px 4px rgba(0,0,0,0.3);
       ">
-        <span class="material-symbols-outlined" style="color: white; font-size: 18px; font-weight: bold;">local_shipping</span>
+        ${svgTruck}
       </div>
     `,
     className: 'custom-vehicle-marker',
@@ -59,17 +80,17 @@ const createVehicleMarker = (status) => {
   });
 };
 
-// Jitter location helper to prevent exact overlaps
+// Jitter location helper to prevent exact overlaps (with larger threshold for visible offset)
 const jitterLocation = (lat, lng, index, array) => {
   let duplicateCount = 0;
   for (let i = 0; i < index; i++) {
-    if (array[i].location && Math.abs(array[i].location[0] - lat) < 0.0001 && Math.abs(array[i].location[1] - lng) < 0.0001) {
+    if (array[i].location && Math.abs(array[i].location[0] - lat) < 0.05 && Math.abs(array[i].location[1] - lng) < 0.05) {
       duplicateCount++;
     }
   }
   if (duplicateCount > 0) {
     const angle = (duplicateCount * 137.5) * (Math.PI / 180);
-    const r = 0.00025 * Math.sqrt(duplicateCount);
+    const r = 0.08 * Math.sqrt(duplicateCount);
     return [lat + r * Math.cos(angle), lng + r * Math.sin(angle)];
   }
   return [lat, lng];
@@ -164,6 +185,7 @@ export default function FleetDashboard() {
     driverId: '',
   });
   const [formErrors, setFormErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -320,6 +342,7 @@ export default function FleetDashboard() {
       return;
     }
     setFormErrors({});
+    setSubmitting(true);
 
     const payload = {
       vehicle_number: formData.vehicleNumber,
@@ -344,7 +367,9 @@ export default function FleetDashboard() {
       alert('Vehicle added successfully to fleet!');
     } catch (err) {
       console.error(err);
-      alert('Error adding vehicle');
+      alert(formatApiError(err, 'Error adding vehicle'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -502,7 +527,7 @@ export default function FleetDashboard() {
                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                       }}
                     />
-                    <Bar dataKey="cost" fill="#06b6d4" radius={[4, 4, 0, 0]} barSize={40} />
+                    <Bar dataKey="cost" fill="#06b6d4" radius={[4, 4, 0, 0]} barSize={40} label={{ position: 'top', fill: '#475569', fontSize: 10, formatter: (val) => `₹${val}` }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -603,7 +628,7 @@ export default function FleetDashboard() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 pr-10 py-2.5 h-11 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="px-4 pr-10 py-2.5 h-11 min-w-[140px] border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
                 <option value="All">All Status</option>
                 <option value="Active">Active</option>
@@ -611,24 +636,22 @@ export default function FleetDashboard() {
                 <option value="Maintenance">Maintenance</option>
                 <option value="Idle">Idle</option>
               </select>
-              {(statusFilter !== "All" || query !== "") && (
-                <button
-                  onClick={() => {
-                    setStatusFilter("All");
-                    setQuery("");
-                  }}
-                  className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                >
-                  <span className="material-symbols-outlined text-base">filter_alt_off</span>
-                  Reset Filters
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setStatusFilter("All");
+                  setQuery("");
+                }}
+                disabled={statusFilter === "All" && query === ""}
+                className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 disabled:text-slate-400 font-semibold border border-red-200 disabled:border-slate-200 rounded-lg bg-red-50 disabled:bg-slate-100 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-base">filter_alt_off</span>
+                Reset Filters
+              </button>
             </div>
           </div>
 
-          {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-max">
               <thead className="bg-slate-50">
                 <tr>
                   {[
@@ -645,9 +668,9 @@ export default function FleetDashboard() {
                       onClick={() => handleSort(col.key)}
                       className="px-5 py-3 text-left text-xs font-semibold text-slate-700 uppercase cursor-pointer hover:bg-slate-100 transition-colors"
                     >
-                      <div className="flex items-center gap-2">
-                        {col.label}
-                        <span className="material-symbols-outlined text-slate-400 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>{col.label}</span>
+                        <span className={`material-symbols-outlined text-sm transition-colors ${sortKey === col.key ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>
                           {sortKey === col.key ? (sortAsc ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
                         </span>
                       </div>
@@ -680,7 +703,7 @@ export default function FleetDashboard() {
                     >
                       <td className="px-5 py-4 text-sm font-medium text-slate-900">
                         {v.id}
-                        <div className="text-xs text-slate-700 font-normal">{v.reg}</div>
+                        <div className="text-xs text-slate-900 font-semibold mt-0.5">{v.reg}</div>
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-700">
                         <div className="flex items-center gap-2">
@@ -805,9 +828,10 @@ export default function FleetDashboard() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition cursor-pointer"
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium transition cursor-pointer disabled:cursor-not-allowed"
                 >
-                  Add Vehicle
+                  {submitting ? 'Adding...' : 'Add Vehicle'}
                 </button>
               </div>
             </form>

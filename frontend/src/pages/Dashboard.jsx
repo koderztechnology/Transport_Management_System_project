@@ -27,15 +27,7 @@ const Dashboard = () => {
 
   const formatChartValue = (value) => {
     if (value === 0) return '₹0';
-    const absValue = Math.abs(value);
-    if (absValue >= 10000000) { // Crore
-      return `₹${(value / 10000000).toFixed(2)} Cr`;
-    } else if (absValue >= 100000) { // Lakh
-      return `₹${(value / 100000).toFixed(2)} L`;
-    } else if (absValue >= 1000) { // Thousand
-      return `₹${(value / 1000).toFixed(1)}K`;
-    }
-    return `₹${value}`;
+    return '₹' + Math.round(value).toLocaleString('en-IN');
   };
 
   const formatIndianCurrency = (amount) => {
@@ -48,6 +40,7 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    document.title = `${userRole} Dashboard | TMS Pro`;
     const fetchDashboardData = async () => {
       try {
         const response = await api.get(`/dashboard/?username=${username}&role=${userRole}`);
@@ -60,7 +53,7 @@ const Dashboard = () => {
       }
     };
     fetchDashboardData();
-  }, []);
+  }, [userRole, username]);
   // Top Summary Cards (KPIs)
   const kpiCards = dashboardData?.kpiCards || [];
 
@@ -142,7 +135,7 @@ const Dashboard = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
             {userRole === 'Admin' ? 'Admin Dashboard' :
-             userRole === 'Vendor' ? 'Vendor Portal' :
+             userRole === 'Vendor' ? 'Vendor Dashboard' :
              userRole === 'Driver' ? 'Driver Dashboard' :
              userRole === 'Manager' ? 'Manager Dashboard' :
              `${userRole} Dashboard`}
@@ -196,47 +189,39 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Trip Status</h3>
             <div className="flex flex-col items-center justify-center py-4">
-              {/* Simple Pie Chart Representation */}
+              {/* Dynamic Recharts Pie Chart Representation */}
               <div className="relative w-40 h-40 mb-4">
-                <svg viewBox="0 0 100 100" className="transform -rotate-90">
-                  {/* Running - 48% */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="20"
-                    strokeDasharray="120 251"
-                    strokeDashoffset="0"
-                  />
-                  {/* Completed - 36% */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="#10b981"
-                    strokeWidth="20"
-                    strokeDasharray="90 251"
-                    strokeDashoffset="-120"
-                  />
-                  {/* Cancelled - 16% */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="#ef4444"
-                    strokeWidth="20"
-                    strokeDasharray="40 251"
-                    strokeDashoffset="-210"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
+                  <PieChart>
+                    <Pie
+                      data={tripStatusData.map(item => ({
+                        name: item.status,
+                        value: item.count || 0
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={65}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {tripStatusData.map((entry, index) => {
+                        let fillHex = '#6366f1';
+                        if (entry.status === 'Running') fillHex = '#3b82f6';
+                        else if (entry.status === 'Completed') fillHex = '#10b981';
+                        else if (entry.status === 'Cancelled' || entry.status === 'Failed') fillHex = '#ef4444';
+                        return <Cell key={`cell-${index}`} fill={fillHex} />;
+                      })}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-900">{dashboardData?.totalTrips || 0}</p>
-                    <p className="text-xs text-slate-600">Total</p>
+                    <p className="text-xs text-slate-500 uppercase font-medium">Total</p>
                   </div>
                 </div>
               </div>
@@ -261,7 +246,7 @@ const Dashboard = () => {
             <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Recent Trips</h3>
-              <button onClick={() => navigate('/trip-management')} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">View All</button>
+              <button onClick={() => navigate('/trip-management')} className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline font-medium cursor-pointer transition">View All</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -362,6 +347,7 @@ const Dashboard = () => {
                     tick={{ fontSize: 12, fill: '#64748b' }}
                     axisLine={{ stroke: '#e2e8f0' }}
                     tickFormatter={formatChartValue}
+                    allowDecimals={false}
                   />
                   <Tooltip 
                     contentStyle={{
@@ -389,6 +375,7 @@ const Dashboard = () => {
                     radius={[4, 4, 0, 0]}
                     maxBarSize={60}
                     minPointSize={5}
+                    label={{ position: 'top', formatter: (val) => val > 0 ? formatChartValue(val) : '', fontSize: 9, fill: '#475569', fontWeight: 500 }}
                   />
                   <Bar 
                     dataKey="expenses" 
@@ -397,6 +384,7 @@ const Dashboard = () => {
                     radius={[4, 4, 0, 0]}
                     maxBarSize={60}
                     minPointSize={5}
+                    label={{ position: 'top', formatter: (val) => val > 0 ? formatChartValue(val) : '', fontSize: 9, fill: '#475569', fontWeight: 500 }}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -464,20 +452,31 @@ const Dashboard = () => {
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Top 5 Cost Heads</h3>
             <div className="space-y-4">
-              {topCostHeads.map((cost, index) => (
-                <div key={index}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-medium text-slate-700">{cost.name}</span>
-                    <span className="text-sm font-semibold text-slate-900">{cost.amount}</span>
-                  </div>
-                  <div className="w-full bg-slate-200 rounded-full h-2">
-                    <div
-                      className="bg-indigo-600 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${cost.percentage}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
+              {(() => {
+                const parsedCosts = topCostHeads.map(cost => {
+                  const val = parseFloat(cost.amount.replace(/[₹,]/g, '')) || 0;
+                  return { ...cost, value: val };
+                });
+                const maxCost = Math.max(...parsedCosts.map(c => c.value), 1);
+                
+                return parsedCosts.map((cost, index) => {
+                  const proportionalWidth = (cost.value / maxCost) * 100;
+                  return (
+                    <div key={index}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-slate-700">{cost.name}</span>
+                        <span className="text-sm font-semibold text-slate-900">{cost.amount}</span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-2">
+                        <div
+                          className="bg-indigo-600 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${proportionalWidth}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
 
@@ -489,7 +488,7 @@ const Dashboard = () => {
                 <span className="material-symbols-outlined text-[20px]">add_circle</span>
                 <span className="font-medium">Add Trip</span>
               </button>
-              <button onClick={() => navigate('/lr-management?action=add')} className="w-full flex items-center gap-3 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors cursor-pointer">
+              <button onClick={() => navigate('/lr-bilty-billing?action=add')} className="w-full flex items-center gap-3 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">receipt_long</span>
                 <span className="font-medium">Create LR</span>
               </button>

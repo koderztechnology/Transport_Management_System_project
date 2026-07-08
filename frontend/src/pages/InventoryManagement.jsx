@@ -71,14 +71,18 @@ const InventoryManagement = () => {
   const lowStockItems = stockItems.filter(item => item.quantity <= item.reorderLevel).length;
   const itemsIssuedThisMonth = 156; // Mock data
 
-  // Filter and search logic
-  const filteredStockItems = stockItems.filter(item => {
-    const matchesCategory = filterCategory === 'All' || item.category === filterCategory;
-    const matchesSearch = searchQuery === '' || 
-      String(item.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(item.category || "").toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+   // Filter and search logic
+  const filteredStockItems = stockItems.filter(item => {
+    const matchesCategory = filterCategory === 'All' || item.category === filterCategory;
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = !q || 
+      String(item.name || "").toLowerCase().includes(q) ||
+      String(item.category || "").toLowerCase().includes(q) ||
+      String(item.id || "").toLowerCase().includes(q) ||
+      String(item.quantity || "").toLowerCase().includes(q) ||
+      String(item.unit || "").toLowerCase().includes(q);
+    return matchesCategory && matchesSearch;
+  });
 
   // Determine stock status
   const getStockStatus = (item) => {
@@ -367,13 +371,30 @@ const InventoryManagement = () => {
     	  			type="text"
     	  			placeholder="Search by name or category..."
     	  			value={searchQuery}
-    	  			onChange={(e) => setSearchQuery(e.target.value)}
-    	  			className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+    	  			onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+    	  			className="w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
     	  		  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setCurrentPage(1);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-lg">close</span>
+                    </button>
+                  )}
     	  		</div>
     	  		<select
     	  		  value={filterCategory}
-    	  		  onChange={(e) => setFilterCategory(e.target.value)}
+    	  		  onChange={(e) => {
+                setFilterCategory(e.target.value);
+                setCurrentPage(1);
+              }}
     	  		  className="pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
     	  		>
     	  		  <option value="All">All Categories</option>
@@ -383,6 +404,18 @@ const InventoryManagement = () => {
     	  		  <option value="Tools">Tools</option>
     	  		  <option value="Misc">Misc</option>
   	  		  </select>
+                <button
+                  onClick={() => {
+                    setFilterCategory('All');
+                    setSearchQuery('');
+                    setCurrentPage(1);
+                  }}
+                  disabled={filterCategory === 'All' && searchQuery === ''}
+                  className="px-4 py-2 text-sm text-red-600 hover:text-red-700 disabled:text-slate-400 font-semibold border border-red-200 disabled:border-slate-200 rounded-lg bg-red-50 disabled:bg-slate-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  <span className="material-symbols-outlined text-base">filter_alt_off</span>
+                  Reset
+                </button>
   	  		</div>
   	  	  </div>
 

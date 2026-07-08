@@ -13,6 +13,22 @@ import {
   ArrowRightCircle,
 } from "lucide-react";
 
+const formatApiError = (err, defaultMsg) => {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    if (typeof data === 'object') {
+      return Object.entries(data)
+        .map(([field, msgs]) => {
+          const fieldName = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          return `${fieldName}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+        })
+        .join('\n');
+    }
+    if (typeof data === 'string') return data;
+  }
+  return err.message || defaultMsg;
+};
+
 /* -------------------- Helpers -------------------- */
 const generateLRNumber = () => {
   const t = Date.now().toString().slice(-6);
@@ -31,6 +47,7 @@ export default function LRManagement() {
   const location = useLocation();
 
   useEffect(() => {
+    document.title = "LR / Bility & Billing";
     fetchLRs();
     fetchRelatedData();
   }, []);
@@ -46,9 +63,9 @@ export default function LRManagement() {
   const fetchRelatedData = async () => {
     try {
       const [vRes, dRes, eRes] = await Promise.all([
-        api.get("/vehicles/"),
-        api.get("/drivers/"),
-        api.get("/eway-bills/")
+        api.get("/vehicles/?options=true"),
+        api.get("/drivers/?options=true"),
+        api.get("/eway-bills/?options=true")
       ]);
       setVehicles(vRes.data || []);
       setDrivers(dRes.data || []);
@@ -95,35 +112,52 @@ export default function LRManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
+  const vehicleMap = useMemo(() => {
+    const map = {};
+    vehicles.forEach(v => {
+      map[String(v.vehicle_id)] = v.vehicle_number;
+    });
+    return map;
+  }, [vehicles]);
+
+  const driverMap = useMemo(() => {
+    const map = {};
+    drivers.forEach(d => {
+      map[String(d.driver_id)] = d.name;
+    });
+    return map;
+  }, [drivers]);
+
   const getVehicleNumber = (vId) => {
-    const found = vehicles.find(v => String(v.vehicle_id) === String(vId));
-    return found ? found.vehicle_number : `Vehicle ${vId}`;
+    return vehicleMap[String(vId)] || (vId ? `Vehicle ${vId}` : 'Unassigned');
   };
 
   const getDriverName = (dId) => {
-    const found = drivers.find(d => String(d.driver_id) === String(dId));
-    return found ? found.name : `Driver ${dId}`;
+    return driverMap[String(dId)] || (dId ? `Driver ${dId}` : 'Unassigned');
   };
 
   const filteredLR = useMemo(() => {
     return lrData.filter(row => {
       const vNum = getVehicleNumber(row.vehicle);
       const dName = getDriverName(row.driver);
-      
-      const matchesSearch =
-        String(row.lrNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(row.consignor || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(row.consignee || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(row.route || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(vNum).toLowerCase().includes(searchQuery.toLowerCase()) ||
-        String(dName).toLowerCase().includes(searchQuery.toLowerCase());
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = !q ||
+        String(row.lrNumber || "").toLowerCase().includes(q) ||
+        String(row.consignor || "").toLowerCase().includes(q) ||
+        String(row.consignee || "").toLowerCase().includes(q) ||
+        String(row.route || "").toLowerCase().includes(q) ||
+        String(row.eway_bill || "").toLowerCase().includes(q) ||
+        String(row.material || "").toLowerCase().includes(q) ||
+        String(row.status || "").toLowerCase().includes(q) ||
+        String(vNum).toLowerCase().includes(q) ||
+        String(dName).toLowerCase().includes(q);
         
       const matchesStatus =
         statusFilter === "All" || String(row.status || "").toLowerCase() === statusFilter.toLowerCase();
         
       return matchesSearch && matchesStatus;
     });
-  }, [lrData, searchQuery, statusFilter, vehicles, drivers]);
+  }, [lrData, searchQuery, statusFilter, vehicleMap, driverMap]);
 
   /* -------------------- Pagination helpers -------------------- */
   const totalPages = Math.max(1, Math.ceil(filteredLR.length / rowsPerPage));
@@ -132,10 +166,15 @@ export default function LRManagement() {
   const currentLRs = filteredLR.slice(indexOfFirst, indexOfLast);
 
   const stats = {
-    totalLR: filteredLR.length,
-    pendingLR: filteredLR.filter((l) => l.status === "pending").length,
-    completedLR: filteredLR.filter((l) => l.status === "billed").length,
-    monthlyLR: filteredLR.filter((l) => l.date?.startsWith("2025-02")).length,
+    totalLR: lrData.length,
+    pendingLR: lrData.filter((l) => l.status === "pending").length,
+    completedLR: lrData.filter((l) => l.status === "billed").length,
+    monthlyLR: lrData.filter((l) => {
+      if (!l.date) return false;
+      const d = new Date(l.date);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length,
   };
 
   /* -------------------- CRUD Actions -------------------- */
@@ -159,8 +198,10 @@ export default function LRManagement() {
       fetchLRs();
       setShowCreate(false);
       setCurrentPage(1);
+      alert("LR Bility created successfully!");
     } catch (err) {
       console.error(err);
+      alert(formatApiError(err, "Failed to create LR Bility."));
     }
   };
 
@@ -196,8 +237,10 @@ export default function LRManagement() {
       fetchLRs();
       setShowEdit(false);
       setSelectedLR(null);
+      alert("LR Bility updated successfully!");
     } catch (err) {
       console.error(err);
+      alert(formatApiError(err, "Failed to update LR Bility."));
     }
   };
 
@@ -208,8 +251,10 @@ export default function LRManagement() {
       fetchLRs();
       setShowDelete(false);
       setSelectedLR(null);
+      alert("LR Bility deleted successfully.");
     } catch (err) {
       console.error(err);
+      alert(formatApiError(err, "Failed to delete LR Bility."));
     }
   };
 
@@ -226,8 +271,10 @@ export default function LRManagement() {
       await api.patch(`/lr-bilty/${id}/`, { status: nextStatus });
       fetchLRs();
       setMenuOpenFor(null);
+      alert(`LR status updated to ${nextStatus}.`);
     } catch(err) {
       console.error(err);
+      alert(formatApiError(err, "Failed to update status."));
     }
   };
 
@@ -238,7 +285,8 @@ export default function LRManagement() {
     date: new Date().toISOString().slice(0, 10),
     consignor: "",
     consignee: "",
-    route: "",
+    origin: "",
+    destination: "",
     vehicle: "",
     driver: "",
     material: "",
@@ -259,13 +307,64 @@ export default function LRManagement() {
     setForm((f) => ({ ...f, [name]: value }));
   };
 
+  const toSentenceCase = (str) => {
+    if (!str) return "";
+    return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   const submitCreate = () => {
-    if (!form.lrNumber || !form.route) {
-      // minimal validation
-      alert("Please enter LR Number and Route");
+    if (!form.lrNumber) {
+      alert("LR Number is required");
       return;
     }
-    handleCreateLR({ ...form, id: Date.now() });
+    if (lrData.some(lr => lr.lrNumber.toLowerCase().trim() === form.lrNumber.toLowerCase().trim())) {
+      alert("LR Number already exists");
+      return;
+    }
+    if (!form.date) {
+      alert("Date is required");
+      return;
+    }
+    if (new Date(form.date) > new Date()) {
+      alert("Date cannot be in the future");
+      return;
+    }
+    if (!form.consignor || !form.consignee || !form.material) {
+      alert("Consignor, Consignee, and Material are required fields");
+      return;
+    }
+    const nameRegex = /^[a-zA-Z0-9\s,.-]+$/;
+    if (!nameRegex.test(form.consignor) || !nameRegex.test(form.consignee) || !nameRegex.test(form.material)) {
+      alert("Consignor, Consignee, and Material cannot contain special characters");
+      return;
+    }
+    if (!form.origin || !form.destination) {
+      alert("Origin and Destination are required");
+      return;
+    }
+    if (form.origin.trim().toLowerCase() === form.destination.trim().toLowerCase()) {
+      alert("Origin and Destination cannot be the same");
+      return;
+    }
+    if (!form.weight || isNaN(form.weight) || parseFloat(form.weight) <= 0) {
+      alert("Weight must be a positive number");
+      return;
+    }
+    if (!form.freight || isNaN(form.freight) || parseFloat(form.freight) <= 0) {
+      alert("Freight must be a positive number");
+      return;
+    }
+    if (!form.vehicle) {
+      alert("Vehicle is required");
+      return;
+    }
+    if (!form.driver) {
+      alert("Driver is required");
+      return;
+    }
+
+    const routeValue = `${form.origin.trim()} to ${form.destination.trim()}`;
+    handleCreateLR({ ...form, route: routeValue, id: Date.now() });
     setForm(emptyForm);
   };
 
@@ -275,7 +374,7 @@ export default function LRManagement() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">LR / Bilty Management</h1>
+          <h1 className="text-2xl font-bold text-slate-900">LR / Bility & Billing</h1>
           <p className="text-slate-500 text-sm mt-1">Create, view and manage LR bills</p>
         </div>
 
@@ -352,7 +451,10 @@ export default function LRManagement() {
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
@@ -373,31 +475,31 @@ export default function LRManagement() {
               <option value="in-transit">In-Transit</option>
               <option value="billed">Billed</option>
             </select>
-            {(statusFilter !== "All" || searchQuery !== "") && (
-              <button
-                onClick={() => {
-                  setStatusFilter("All");
-                  setSearchQuery("");
-                }}
-                className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-              >
-                <span className="material-symbols-outlined text-base">filter_alt_off</span>
-                Reset
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setStatusFilter("All");
+                setSearchQuery("");
+                setCurrentPage(1);
+              }}
+              disabled={statusFilter === "All" && searchQuery === ""}
+              className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 disabled:text-slate-400 font-semibold border border-red-200 disabled:border-slate-200 rounded-lg bg-red-50 disabled:bg-slate-100 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-base">filter_alt_off</span>
+              Reset
+            </button>
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full min-w-max text-left border-collapse">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">LR Number</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Route</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Vehicle</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Freight</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="py-4 px-6 text-xs font-semibold text-slate-500 tracking-wider">LR Number</th>
+                <th className="py-4 px-6 text-xs font-semibold text-slate-500 tracking-wider">Date</th>
+                <th className="py-4 px-6 text-xs font-semibold text-slate-500 tracking-wider">Route</th>
+                <th className="py-4 px-6 text-xs font-semibold text-slate-500 tracking-wider">Vehicle</th>
+                <th className="py-4 px-6 text-xs font-semibold text-slate-500 tracking-wider">Freight</th>
+                <th className="py-4 px-6 text-xs font-semibold text-slate-500 tracking-wider">Status</th>
+                <th className="py-4 px-6 text-xs font-semibold text-slate-500 tracking-wider text-right">Actions</th>
               </tr>
             </thead>
 
@@ -496,44 +598,39 @@ export default function LRManagement() {
             <span className="font-medium">{lrData.length}</span> results
           </p>
          <div className="flex items-center gap-3">
+           {currentPage > 1 && (
+             <button
+               onClick={() => setCurrentPage(currentPage - 1)}
+               className="px-4 py-2 rounded-lg border bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+             >
+               Previous
+             </button>
+           )}
+
+           <span className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium">
+             {currentPage}
+           </span>
 
            <button
-             onClick={() => setCurrentPage(currentPage - 1)}
-             disabled={currentPage === 1}
+             onClick={() => setCurrentPage(currentPage + 1)}
+             disabled={currentPage === totalPages}
              className={`px-4 py-2 rounded-lg border ${
-               currentPage === 1
+               currentPage === totalPages
                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            Previous
-          </button>
-
-          <span className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium">
-            {currentPage}
-          </span>
-
-          <button
-            onClick={() => setCurrentPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-lg border ${
-              currentPage === totalPages
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            Next
-          </button>
-
-        </div>
+             }`}
+           >
+             Next
+           </button>
+         </div>
         </div>
       </div>
 
       {/* ----------------- Create Modal ----------------- */}
       {showCreate && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-3xl shadow-2xl border border-slate-100 p-6 animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-6 border-b border-slate-200">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">Create New LR</h3>
                 <p className="text-sm text-slate-500">Enter consignment details below</p>
@@ -546,62 +643,59 @@ export default function LRManagement() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <InputGroup label="LR Number" name="lrNumber" value={form.lrNumber} onChange={handleFormChange} />
-              <InputGroup label="Date" type="date" name="date" value={form.date} onChange={handleFormChange} />
-              <InputGroup label="Consignor" name="consignor" value={form.consignor} onChange={handleFormChange} placeholder="Sender name" />
-              <InputGroup label="Consignee" name="consignee" value={form.consignee} onChange={handleFormChange} placeholder="Receiver name" />
-              <InputGroup label="Route" name="route" value={form.route} onChange={handleFormChange} placeholder="Origin → Destination" />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle</label>
-                <select name="vehicle" value={form.vehicle} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
-                  <option value="">Select Vehicle</option>
-                  {vehicles.slice(0, 100).map(v => <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Driver</label>
-                <select name="driver" value={form.driver} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
-                  <option value="">Select Driver</option>
-                  {drivers.slice(0, 100).map(d => <option key={d.driver_id} value={d.driver_id}>{d.name || `Driver ${d.driver_id}`}</option>)}
-                </select>
-              </div>
-              <InputGroup label="Material" name="material" value={form.material} onChange={handleFormChange} placeholder="Material Description" />
-              <InputGroup label="Weight" name="weight" value={form.weight} onChange={handleFormChange} placeholder="e.g. 1200 kg" />
-              <InputGroup label="Freight" name="freight" value={form.freight} onChange={handleFormChange} placeholder="Amount (₹)" />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Eway Bill</label>
-                <select name="eway" value={form.eway} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
-                  <option value="">Select EWay Bill</option>
-                  {ewayBills.map(e => <option key={e.eway_id} value={e.eway_id}>{e.eway_number || `EWay ${e.eway_id}`}</option>)}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-                <select
-                  name="status"
-                  value={form.status}
-                  onChange={handleFormChange}
-                  className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="in-transit">In-Transit</option>
-                  <option value="billed">Billed</option>
-                </select>
+            <div className="overflow-y-auto flex-1 p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <InputGroup label="LR Number" name="lrNumber" value={form.lrNumber} readOnly className="w-full border border-slate-200 rounded-lg px-3 py-2 bg-slate-100 text-slate-600 focus:outline-none cursor-not-allowed" />
+                <InputGroup label="Date *" type="date" name="date" value={form.date} max={new Date().toISOString().split("T")[0]} onChange={handleFormChange} />
+                <InputGroup label="Consignor *" name="consignor" value={form.consignor} onChange={handleFormChange} placeholder="Sender name" />
+                <InputGroup label="Consignee *" name="consignee" value={form.consignee} onChange={handleFormChange} placeholder="Receiver name" />
+                <InputGroup label="Origin *" name="origin" value={form.origin} onChange={handleFormChange} placeholder="e.g. Pune" />
+                <InputGroup label="Destination *" name="destination" value={form.destination} onChange={handleFormChange} placeholder="e.g. Mumbai" />
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle *</label>
+                  <select name="vehicle" value={form.vehicle} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                    <option value="">Select Vehicle</option>
+                    {vehicles.slice(0, 100).map(v => <option key={v.vehicle_id} value={String(v.vehicle_id)}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Driver *</label>
+                  <select name="driver" value={form.driver} onChange={handleFormChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                    <option value="">Select Driver</option>
+                    {drivers.slice(0, 100).map(d => <option key={d.driver_id} value={String(d.driver_id)}>{toSentenceCase(d.name)}</option>)}
+                  </select>
+                </div>
+                <InputGroup label="Material *" name="material" value={form.material} onChange={handleFormChange} placeholder="Material Description" />
+                <InputGroup label="Weight (kg) *" type="number" min="1" step="any" name="weight" value={form.weight} onChange={handleFormChange} placeholder="e.g. 1200" />
+                <InputGroup label="Freight (₹) *" type="number" min="1" step="any" name="freight" value={form.freight} onChange={handleFormChange} placeholder="Amount (₹)" />
+                <InputGroup label="Eway Bill Number" name="eway" value={form.eway} onChange={handleFormChange} placeholder="e.g. EWB-123456" />
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                  <select
+                    name="status"
+                    value={form.status}
+                    onChange={handleFormChange}
+                    className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in-transit">In-Transit</option>
+                    <option value="billed">Billed</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100">
+            <div className="flex justify-end gap-3 p-6 border-t border-slate-200 bg-slate-50">
               <button
                 onClick={() => setShowCreate(false)}
-                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 font-medium transition-colors"
+                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 font-medium transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={submitCreate}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm transition-colors"
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm transition-colors cursor-pointer"
               >
                 Create LR
               </button>
@@ -634,9 +728,9 @@ export default function LRManagement() {
               <DetailItem label="Vehicle" value={vehicles.find(v => String(v.vehicle_id) === String(selectedLR.vehicle))?.vehicle_number || selectedLR.vehicle} />
               <DetailItem label="Driver" value={drivers.find(d => String(d.driver_id) === String(selectedLR.driver))?.name || selectedLR.driver} />
               <DetailItem label="Material" value={selectedLR.material} />
-              <DetailItem label="Weight" value={selectedLR.weight} />
-              <DetailItem label="Freight" value={selectedLR.freight} />
-              <DetailItem label="Eway Bill" value={ewayBills.find(e => String(e.eway_id) === String(selectedLR.eway))?.eway_number || selectedLR.eway} />
+              <DetailItem label="Weight" value={selectedLR.weight ? `${selectedLR.weight} kg` : "-"} />
+              <DetailItem label="Freight" value={selectedLR.freight ? `₹${selectedLR.freight}` : "-"} />
+              <DetailItem label="Eway Bill" value={selectedLR.eway || "-"} />
               
               <div>
                 <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</div>
@@ -731,7 +825,19 @@ const DetailItem = ({ label, value }) => (
 
 /* ----------------- EditModal Component ----------------- */
 function EditModal({ lr, vehicles, drivers, ewayBills, onClose, onSave }) {
-  const [editForm, setEditForm] = useState({ ...lr });
+  const toSentenceCase = (str) => {
+    if (!str) return "";
+    return str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const [editForm, setEditForm] = useState(() => {
+    const parts = lr.route ? lr.route.split(/ to | → | - /) : ["", ""];
+    return {
+      ...lr,
+      origin: parts[0] || "",
+      destination: parts[1] || "",
+    };
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -739,75 +845,114 @@ function EditModal({ lr, vehicles, drivers, ewayBills, onClose, onSave }) {
   };
 
   const save = () => {
-    if (!editForm.lrNumber || !editForm.route) {
-      alert("Please fill LR Number & Route");
+    if (!editForm.lrNumber) {
+      alert("Please fill LR Number");
       return;
     }
-    onSave(editForm);
+    if (!editForm.date) {
+      alert("Date is required");
+      return;
+    }
+    if (new Date(editForm.date) > new Date()) {
+      alert("Date cannot be in the future");
+      return;
+    }
+    if (!editForm.origin || !editForm.destination) {
+      alert("Origin and Destination are required");
+      return;
+    }
+    if (editForm.origin.trim().toLowerCase() === editForm.destination.trim().toLowerCase()) {
+      alert("Origin and Destination cannot be the same");
+      return;
+    }
+    if (!editForm.weight || isNaN(editForm.weight) || parseFloat(editForm.weight) <= 0) {
+      alert("Weight must be a positive number");
+      return;
+    }
+    if (!editForm.freight || isNaN(editForm.freight) || parseFloat(editForm.freight) <= 0) {
+      alert("Freight must be a positive number");
+      return;
+    }
+    if (!editForm.consignor || !editForm.consignee || !editForm.material) {
+      alert("Consignor, Consignee, and Material are required");
+      return;
+    }
+    const nameRegex = /^[a-zA-Z0-9\s,.-]+$/;
+    if (!nameRegex.test(editForm.consignor) || !nameRegex.test(editForm.consignee) || !nameRegex.test(editForm.material)) {
+      alert("Consignor, Consignee, and Material cannot contain special characters");
+      return;
+    }
+
+    const routeValue = `${editForm.origin.trim()} to ${editForm.destination.trim()}`;
+    onSave({
+      ...editForm,
+      route: routeValue
+    });
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-3xl shadow-2xl border border-slate-100 p-6 animate-in fade-in zoom-in duration-200">
-        <div className="flex justify-between items-center mb-6">
+      <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200">
+        <div className="flex justify-between items-center p-6 border-b border-slate-200">
           <h3 className="text-xl font-bold text-slate-900">Edit LR Details</h3>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
             <X size={20} />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <InputGroup label="LR Number" name="lrNumber" value={editForm.lrNumber} onChange={handleChange} />
-          <InputGroup label="Date" type="date" name="date" value={editForm.date} onChange={handleChange} />
-          <InputGroup label="Route" name="route" value={editForm.route} onChange={handleChange} />
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle</label>
-            <select name="vehicle" value={editForm.vehicle} onChange={handleChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
-              <option value="">Select Vehicle</option>
-              {vehicles.slice(0, 100).map(v => <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>)}
-            </select>
-          </div>
-          <InputGroup label="Freight" name="freight" value={editForm.freight} onChange={handleChange} />
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Driver</label>
-            <select name="driver" value={editForm.driver} onChange={handleChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
-              <option value="">Select Driver</option>
-              {drivers.slice(0, 100).map(d => <option key={d.driver_id} value={d.driver_id}>{d.name || `Driver ${d.driver_id}`}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Eway Bill</label>
-            <select name="eway" value={editForm.eway || ""} onChange={handleChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
-              <option value="">Select EWay Bill</option>
-              {ewayBills.map(e => <option key={e.eway_id} value={e.eway_id}>{e.eway_number || `EWay ${e.eway_id}`}</option>)}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-            <select
-              name="status"
-              value={editForm.status}
-              onChange={handleChange}
-              className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
-            >
-              <option value="pending">Pending</option>
-              <option value="in-transit">In-Transit</option>
-              <option value="billed">Billed</option>
-            </select>
+        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <InputGroup label="LR Number" name="lrNumber" value={editForm.lrNumber} readOnly className="w-full border border-slate-200 rounded-lg px-3 py-2 bg-slate-100 text-slate-600 focus:outline-none cursor-not-allowed" />
+            <InputGroup label="Date *" type="date" name="date" value={editForm.date} max={new Date().toISOString().split("T")[0]} onChange={handleChange} />
+            <InputGroup label="Consignor *" name="consignor" value={editForm.consignor || ""} onChange={handleChange} />
+            <InputGroup label="Consignee *" name="consignee" value={editForm.consignee || ""} onChange={handleChange} />
+            <InputGroup label="Origin *" name="origin" value={editForm.origin} onChange={handleChange} />
+            <InputGroup label="Destination *" name="destination" value={editForm.destination} onChange={handleChange} />
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle *</label>
+              <select name="vehicle" value={editForm.vehicle || ""} onChange={handleChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                <option value="">Select Vehicle</option>
+                {vehicles.slice(0, 100).map(v => <option key={v.vehicle_id} value={String(v.vehicle_id)}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Driver *</label>
+              <select name="driver" value={editForm.driver || ""} onChange={handleChange} className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white">
+                <option value="">Select Driver</option>
+                {drivers.slice(0, 100).map(d => <option key={d.driver_id} value={String(d.driver_id)}>{toSentenceCase(d.name)}</option>)}
+              </select>
+            </div>
+            <InputGroup label="Material *" name="material" value={editForm.material || ""} onChange={handleChange} />
+            <InputGroup label="Weight (kg) *" type="number" min="1" step="any" name="weight" value={editForm.weight || ""} onChange={handleChange} />
+            <InputGroup label="Freight (₹) *" type="number" min="1" step="any" name="freight" value={editForm.freight || ""} onChange={handleChange} />
+            <InputGroup label="Eway Bill Number" name="eway" value={editForm.eway || ""} onChange={handleChange} />
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <select
+                name="status"
+                value={editForm.status}
+                onChange={handleChange}
+                className="w-full border border-slate-200 rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
+              >
+                <option value="pending">Pending</option>
+                <option value="in-transit">In-Transit</option>
+                <option value="billed">Billed</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100">
+        <div className="flex justify-end gap-3 p-6 border-t border-slate-200 bg-slate-50">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 font-medium transition-colors"
+            className="px-4 py-2 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 font-medium transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={save}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm transition-colors"
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm transition-colors cursor-pointer"
           >
             Save Changes
           </button>

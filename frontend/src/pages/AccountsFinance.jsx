@@ -1,6 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
+
+const formatApiError = (err, defaultMsg) => {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    if (typeof data === 'object') {
+      return Object.entries(data)
+        .map(([field, msgs]) => {
+          const fieldName = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          return `${fieldName}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+        })
+        .join('\n');
+    }
+    if (typeof data === 'string') return data;
+  }
+  return err.message || defaultMsg;
+};
 
 const AccountsFinance = () => {
   const location = useLocation();
@@ -10,10 +26,13 @@ const AccountsFinance = () => {
 
   // Main transactions data array
   const [transactions, setTransactions] = useState([]);
-
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
   const [vendors, setVendors] = useState([]);
+
+  useEffect(() => {
+    document.title = "Accounts & Finance";
+  }, []);
 
   useEffect(() => {
     fetchTransactions();
@@ -23,9 +42,9 @@ const AccountsFinance = () => {
   const fetchRelatedData = async () => {
     try {
       const [vRes, tRes, venRes] = await Promise.all([
-        api.get('/vehicles/'),
-        api.get('/trips/'),
-        api.get('/vendors/')
+        api.get('/vehicles/?options=true'),
+        api.get('/trips/?options=true'),
+        api.get('/vendors/?options=true')
       ]);
       setVehicles(vRes.data);
       setTrips(tRes.data);
@@ -39,7 +58,7 @@ const AccountsFinance = () => {
     try {
       const res = await api.get('/finance-transactions/');
       const mapped = res.data.map(t => ({
-        id: t.transaction_id,
+        id: t.id,
         date: t.date || '',
         type: t.type || 'Income',
         description: t.description || '',
@@ -61,6 +80,8 @@ const AccountsFinance = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingTransactionId, setEditingTransactionId] = useState(null);
   const [modalType, setModalType] = useState(''); // 'income' or 'expense'
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingTransaction, setDeletingTransaction] = useState(null);
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -77,6 +98,7 @@ const AccountsFinance = () => {
 
   // Form validation errors
   const [formErrors, setFormErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,45 +144,48 @@ const AccountsFinance = () => {
   };
 
   // Filter transactions
-  const filteredTransactions = transactions.filter(txn => {
-    const matchesSearch = searchQuery === '' || 
-      String(txn.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(txn.category || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(txn.type || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(txn.id || "").toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesType = filterType === 'All' || txn.type === filterType;
-    const matchesStatus = filterStatus === 'All' || txn.status === filterStatus;
-    
-    return matchesSearch && matchesType && matchesStatus;
-  });
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(txn => {
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = !q || 
+        String(txn.description || "").toLowerCase().includes(q) ||
+        String(txn.category || "").toLowerCase().includes(q) ||
+        String(txn.type || "").toLowerCase().includes(q) ||
+        String(txn.status || "").toLowerCase().includes(q) ||
+        String(txn.amount || "").toLowerCase().includes(q) ||
+        String(txn.id || "").toLowerCase().includes(q);
+      
+      const matchesType = filterType === 'All' || txn.type === filterType;
+      const matchesStatus = filterStatus === 'All' || txn.status === filterStatus;
+      
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }, [transactions, searchQuery, filterType, filterStatus]);
 
   const handleDownloadReport = () => {
     const headers = ["Transaction ID", "Date", "Type", "Description", "Amount", "Status", "Category"];
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [
-        headers.join(","),
-        ...filteredTransactions.map((t) =>
-          [
-            t.id,
-            t.date,
-            t.type,
-            `"${t.description}"`,
-            t.amount,
-            t.status,
-            `"${t.category}"`
-          ].join(",")
-        ),
-      ].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
+    const rows = [headers];
+    filteredTransactions.forEach((t) => {
+      rows.push([
+        t.id,
+        t.date,
+        t.type,
+        t.description,
+        t.amount,
+        t.status,
+        t.category,
+      ]);
+    });
+    const csvContent = rows.map((e) => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", "finance_report.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    alert("Finance report downloaded successfully!");
   };
 
   // Get status class
@@ -183,10 +208,14 @@ const AccountsFinance = () => {
     const completedExpenses = transactions.filter(t => t.type === 'Expense' && t.status === 'Completed');
     
     completedExpenses.forEach(txn => {
-      if (categories[txn.category]) {
-        categories[txn.category] += txn.amount;
+      let cat = txn.category || 'Misc';
+      if (cat.trim().toLowerCase().replace(' ', '') === 'freightexpence') {
+        cat = 'Freight Expense';
+      }
+      if (categories[cat]) {
+        categories[cat] += txn.amount;
       } else {
-        categories[txn.category] = txn.amount;
+        categories[cat] = txn.amount;
       }
     });
 
@@ -319,10 +348,18 @@ const AccountsFinance = () => {
 
     if (!formData.date) {
       errors.date = 'Date is required';
+    } else {
+      const selectedDate = new Date(formData.date);
+      const minDate = new Date('2025-01-01');
+      if (selectedDate < minDate) {
+        errors.date = 'Historical dates before Jan 1, 2025 are not allowed';
+      }
     }
 
     if (!formData.description.trim()) {
       errors.description = 'Description is required';
+    } else if (!/^[a-zA-Z\s,.-]+$/.test(formData.description.trim())) {
+      errors.description = 'Description cannot contain numbers, math characters, or special signs';
     }
 
     if (!Number.isFinite(amountValue) || amountValue <= 0) {
@@ -331,6 +368,18 @@ const AccountsFinance = () => {
 
     if (!formData.category) {
       errors.category = 'Category is required';
+    }
+
+    if (modalType === 'expense' && ['Fuel', 'Toll', 'Maintenance'].includes(formData.category)) {
+      if (!formData.vehicle) {
+        errors.vehicle = 'Vehicle is required for Fuel/Toll/Maintenance expenses';
+      }
+      if (!formData.trip) {
+        errors.trip = 'Trip is required for Fuel/Toll/Maintenance expenses';
+      }
+      if (!formData.vendor) {
+        errors.vendor = 'Vendor is required for Fuel/Toll/Maintenance expenses';
+      }
     }
 
     setFormErrors(errors);
@@ -357,19 +406,24 @@ const AccountsFinance = () => {
       vendor: formData.vendor || null,
     };
 
+    setSubmitting(true);
     try {
       if (isEditMode) {
         // UPDATE existing transaction
         await api.put(`/finance-transactions/${editingTransactionId}/`, payload);
+        alert('Transaction updated successfully!');
       } else {
         // ADD new transaction
         await api.post('/finance-transactions/', payload);
+        alert('Transaction added successfully!');
       }
       fetchTransactions();
       handleCloseModal();
     } catch (err) {
       console.error('Error saving transaction', err);
-      alert('Failed to save transaction');
+      alert(formatApiError(err, 'Failed to save transaction'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -377,19 +431,35 @@ const AccountsFinance = () => {
   // DELETE FUNCTIONALITY
   // ========================================
 
-  const handleDeleteTransaction = async (txn) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete this transaction?\n\n${txn.description}\nAmount: ${formatCurrency(txn.amount)}\n\nThis action cannot be undone.`
-    );
+  const handleDeleteTransaction = (txn) => {
+    setDeletingTransaction(txn);
+    setShowDeleteModal(true);
+  };
 
-    if (confirmed) {
-      try {
-        await api.delete(`/finance-transactions/${txn.id}/`);
-        fetchTransactions();
-      } catch (err) {
-        console.error('Error deleting transaction', err);
-        alert('Failed to delete transaction');
-      }
+  const handleConfirmDeleteTransaction = async () => {
+    if (!deletingTransaction) return;
+
+    if (!navigator.onLine) {
+      alert("Network Connection Failure: You are currently offline. Please check your internet connection and try again.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.delete(`/finance-transactions/${deletingTransaction.id}/`);
+      fetchTransactions();
+      setShowDeleteModal(false);
+      setDeletingTransaction(null);
+      alert('Transaction deleted successfully.');
+    } catch (err) {
+      console.error('Error deleting transaction', err);
+      const isNetworkError = !err.response || err.message === "Network Error" || err.code === "ERR_NETWORK";
+      const errMsg = isNetworkError 
+        ? "Network interruption occurred. Delete operation failed. Please check your network and try again." 
+        : formatApiError(err, 'Failed to delete transaction');
+      alert(errMsg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -450,11 +520,6 @@ const AccountsFinance = () => {
       {/* Page Header */}
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-2">
-            <span>Home</span>
-            <span className="material-symbols-outlined text-xs">chevron_right</span>
-            <span>Accounts & Finance</span>
-          </div>
           <h1 className="text-slate-900 text-2xl lg:text-3xl font-bold">
             Accounts & Finance
           </h1>
@@ -539,13 +604,19 @@ const AccountsFinance = () => {
                 type="text"
                 placeholder="Search transactions..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
             <select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={(e) => {
+                setFilterType(e.target.value);
+                setCurrentPage(1);
+              }}
               className="pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             >
               <option value="All">All Types</option>
@@ -554,7 +625,10 @@ const AccountsFinance = () => {
             </select>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
               className="pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             >
               <option value="All">All Status</option>
@@ -562,18 +636,30 @@ const AccountsFinance = () => {
               <option value="Pending">Pending</option>
               <option value="Failed">Failed</option>
             </select>
+            <button
+              onClick={() => {
+                setFilterType('All');
+                setFilterStatus('All');
+                setSearchQuery('');
+              }}
+              disabled={filterType === 'All' && filterStatus === 'All' && searchQuery === ''}
+              className="px-4 py-2 text-sm text-red-600 hover:text-red-700 disabled:text-slate-400 font-semibold border border-red-200 disabled:border-slate-200 rounded-lg bg-red-50 disabled:bg-slate-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-base">filter_alt_off</span>
+              Reset
+            </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full min-w-max text-left">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Date</th>
-                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Description</th>
-                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Type</th>
-                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Amount</th>
-                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Status</th>
-                  <th className="p-3 text-xs font-semibold text-slate-700 uppercase">Actions</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700">Date</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700">Description</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700">Type</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700">Amount</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700">Status</th>
+                  <th className="p-3 text-xs font-semibold text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -820,44 +906,26 @@ const AccountsFinance = () => {
             {/* Modal Form */}
             <form onSubmit={handleSubmitForm} className="p-5 space-y-5 overflow-y-auto">
               
-              {/* Date and Type - Side by Side */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    name="date"
-                    value={formData.date}
-                    onChange={handleInputChange}
-                    max={new Date().toISOString().split('T')[0]}
-                    className={`w-full px-4 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
-                      formErrors.date 
-                        ? 'border-red-500 focus:ring-red-500' 
-                        : 'border-slate-200 focus:ring-primary/50'
-                    }`}
-                  />
-                  {formErrors.date && (
-                    <p className="mt-1 text-sm text-red-500">{formErrors.date}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Type
-                  </label>
-                  <select
-                    name="type"
-                    value={formData.type}
-                    onChange={handleInputChange}
-                    disabled
-                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-slate-100 text-slate-900 focus:outline-none cursor-not-allowed"
-                  >
-                    <option value="Income">Income</option>
-                    <option value="Expense">Expense</option>
-                  </select>
-                </div>
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleInputChange}
+                  max={new Date().toISOString().split('T')[0]}
+                  className={`w-full px-4 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                    formErrors.date 
+                      ? 'border-red-500 focus:ring-red-500' 
+                      : 'border-slate-200 focus:ring-primary/50'
+                  }`}
+                />
+                {formErrors.date && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.date}</p>
+                )}
               </div>
 
               {/* Description */}
@@ -910,48 +978,63 @@ const AccountsFinance = () => {
               {/* Related Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Vehicle (Optional)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Vehicle {modalType === 'expense' && ['Fuel', 'Toll', 'Maintenance'].includes(formData.category) ? <span className="text-red-500">*</span> : '(Optional)'}
+                  </label>
                   <select
                     name="vehicle"
                     value={formData.vehicle}
                     onChange={handleInputChange}
-                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={`w-full pl-4 pr-10 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                      formErrors.vehicle ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-primary/50'
+                    }`}
                   >
                     <option value="">Select Vehicle</option>
                     {vehicles.slice(0, 100).map(v => (
-                      <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
+                      <option key={v.vehicle_id} value={String(v.vehicle_id)}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
                     ))}
                   </select>
+                  {formErrors.vehicle && <p className="text-red-500 text-xs mt-1">{formErrors.vehicle}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Trip (Optional)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Trip {modalType === 'expense' && ['Fuel', 'Toll', 'Maintenance'].includes(formData.category) ? <span className="text-red-500">*</span> : '(Optional)'}
+                  </label>
                   <select
                     name="trip"
                     value={formData.trip}
                     onChange={handleInputChange}
-                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={`w-full pl-4 pr-10 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                      formErrors.trip ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-primary/50'
+                    }`}
                   >
                     <option value="">Select Trip</option>
                     {trips.slice(0, 100).map(t => (
-                      <option key={t.trip_id} value={t.trip_id}>
+                      <option key={t.trip_id} value={String(t.trip_id)}>
                         {t.start_location} to {t.end_location} (ID: {t.trip_id})
                       </option>
                     ))}
                   </select>
+                  {formErrors.trip && <p className="text-red-500 text-xs mt-1">{formErrors.trip}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Vendor (Optional)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Vendor {modalType === 'expense' && ['Fuel', 'Toll', 'Maintenance'].includes(formData.category) ? <span className="text-red-500">*</span> : '(Optional)'}
+                  </label>
                   <select
                     name="vendor"
                     value={formData.vendor}
                     onChange={handleInputChange}
-                    className="w-full pl-4 pr-10 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className={`w-full pl-4 pr-10 py-2 border rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 ${
+                      formErrors.vendor ? 'border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-primary/50'
+                    }`}
                   >
                     <option value="">Select Vendor</option>
                     {vendors.slice(0, 100).map(ven => (
-                      <option key={ven.vendor_id} value={ven.vendor_id}>{ven.name}</option>
+                      <option key={ven.vendor_id} value={String(ven.vendor_id)}>{ven.name}</option>
                     ))}
                   </select>
+                  {formErrors.vendor && <p className="text-red-500 text-xs mt-1">{formErrors.vendor}</p>}
                 </div>
               </div>
 
@@ -1002,20 +1085,58 @@ const AccountsFinance = () => {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100:bg-slate-700 transition-colors font-medium"
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className={`flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors font-medium ${
+                  disabled={submitting}
+                  className={`flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
                     modalType === 'income' ? 'bg-green-600' : 'bg-red-600'
                   }`}
                 >
-                  {isEditMode ? 'Update Transaction' : 'Add Transaction'}
+                  {submitting ? 'Saving...' : (isEditMode 
+                    ? `Update ${modalType === 'income' ? 'Income' : 'Expense'}` 
+                    : `Add ${modalType === 'income' ? 'Income' : 'Expense'}`)
+                  }
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {showDeleteModal && deletingTransaction && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Transaction Confirmation</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Are you sure you want to delete transaction <strong className="text-slate-900">{deletingTransaction.description}</strong> of amount <strong className="text-slate-900">{formatCurrency(deletingTransaction.amount)}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletingTransaction(null);
+                }}
+                disabled={submitting}
+                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteTransaction}
+                disabled={submitting}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition cursor-pointer disabled:bg-red-400 flex items-center gap-1.5"
+              >
+                {submitting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -133,6 +133,11 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.MD5PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+
 # ---------------------------------------------------------
 # INTERNATIONALIZATION
 # ---------------------------------------------------------
@@ -182,7 +187,10 @@ from django.db.backends.signals import connection_created
 from django.dispatch import receiver
 
 @receiver(connection_created)
-def disable_sqlite_fkeys(sender, connection, **kwargs):
+def configure_sqlite(sender, connection, **kwargs):
     if connection.vendor == 'sqlite':
         with connection.cursor() as cursor:
             cursor.execute('PRAGMA foreign_keys = OFF;')
+            cursor.execute('PRAGMA journal_mode = WAL;')
+            cursor.execute('PRAGMA synchronous = OFF;')
+            cursor.execute('PRAGMA cache_size = 20000;')

@@ -2,6 +2,22 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
 
+const formatApiError = (err, defaultMsg) => {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    if (typeof data === 'object') {
+      return Object.entries(data)
+        .map(([field, msgs]) => {
+          const fieldName = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          return `${fieldName}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+        })
+        .join('\n');
+    }
+    if (typeof data === 'string') return data;
+  }
+  return err.message || defaultMsg;
+};
+
 const VehicleManagement = () => {
   const location = useLocation();
   // ============================================================
@@ -60,6 +76,13 @@ const VehicleManagement = () => {
     fetchDrivers();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get("search");
+    setSearchQuery(q || "");
+    setCurrentPage(1);
+  }, [location.search]);
+
   const fetchDrivers = async () => {
     try {
       const res = await api.get('/drivers/');
@@ -107,10 +130,10 @@ const VehicleManagement = () => {
   // ============================================================
   const statistics = {
     total: vehicles.length,
-    active: vehicles.filter(v => v.status === 'Active').length,
-    maintenance: vehicles.filter(v => v.status === 'Maintenance').length,
+    active: vehicles.filter(v => v.status === 'Available' || v.status === 'In Trip' || v.status === 'Active').length,
+    maintenance: vehicles.filter(v => v.status === 'Under Maintenance' || v.status === 'Maintenance').length,
     documentsExpiring: vehicles.filter(v => 
-      Object.values(v.documentsStatus).some(s => s === 'expiring_soon' || s === 'critical')
+      v.documentsStatus && Object.values(v.documentsStatus).some(s => s === 'expiring_soon' || s === 'critical')
     ).length,
     totalCapacity: '110 MT',
   };
@@ -206,7 +229,7 @@ const VehicleManagement = () => {
       alert('Vehicle added successfully!');
     } catch (err) {
       console.error(err);
-      alert('Error adding vehicle');
+      alert(formatApiError(err, 'Error adding vehicle'));
     }
   };
 
@@ -223,7 +246,7 @@ const VehicleManagement = () => {
         alert('Vehicle deleted successfully');
       } catch (err) {
         console.error(err);
-        alert('Error deleting vehicle');
+        alert(formatApiError(err, 'Error deleting vehicle'));
       }
     }
   };
@@ -235,7 +258,7 @@ const VehicleManagement = () => {
       alert(`Vehicle status updated to ${newStatus}`);
     } catch (err) {
       console.error(err);
-      alert('Error updating status');
+      alert(formatApiError(err, 'Error updating status'));
     }
   };
 
@@ -248,10 +271,13 @@ const VehicleManagement = () => {
   // FILTERING LOGIC
   // ============================================================
   const filteredVehicles = vehicles.filter(vehicle => {
-    const matchesSearch = 
-      String(vehicle.vehicleNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(vehicle.model || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(getDriverName(vehicle.owner)).toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = !q ||
+      String(vehicle.vehicleNumber || "").toLowerCase().includes(q) ||
+      String(vehicle.vehicleType || "").toLowerCase().includes(q) ||
+      String(vehicle.model || "").toLowerCase().includes(q) ||
+      String(vehicle.status || "").toLowerCase().includes(q) ||
+      String(getDriverName(vehicle.owner)).toLowerCase().includes(q);
 
     const matchesStatus = filterStatus === 'all' || vehicle.status === filterStatus;
 
@@ -850,9 +876,9 @@ const VehicleManagement = () => {
                 className="pl-4 pr-10 py-2.5 rounded-lg border border-slate-200 bg-white font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
                 <option value="">Update Status</option>
-                <option value="Active">Active</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Inactive">Inactive</option>
+                <option value="Available">Available</option>
+                <option value="Under Maintenance">Under Maintenance</option>
+                <option value="In Trip">In Trip</option>
               </select>
               <div className="flex gap-2 w-full sm:w-auto">
                 <button
@@ -892,12 +918,18 @@ const VehicleManagement = () => {
               type="text"
               placeholder="Search by Vehicle Number, Model, or Driver Name..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full pl-10 pr-10 py-2.5 h-11 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
@@ -907,7 +939,10 @@ const VehicleManagement = () => {
           <div className="flex gap-2 w-full md:w-auto items-center">
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-4 pr-10 py-2.5 h-11 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
             >
               <option value="all">All Status</option>
@@ -915,25 +950,24 @@ const VehicleManagement = () => {
               <option value="In Trip">In Trip</option>
               <option value="Under Maintenance">Under Maintenance</option>
             </select>
-            {(filterStatus !== 'all' || searchQuery !== '') && (
-              <button
-                onClick={() => {
-                  setFilterStatus('all');
-                  setSearchQuery('');
-                }}
-                className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-              >
-                <span className="material-symbols-outlined text-base">filter_alt_off</span>
-                Reset
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setFilterStatus('all');
+                setSearchQuery('');
+                setCurrentPage(1);
+              }}
+              disabled={filterStatus === 'all' && searchQuery === ''}
+              className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 disabled:text-slate-400 font-semibold border border-red-200 disabled:border-slate-200 rounded-lg bg-red-50 disabled:bg-slate-100 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-base">filter_alt_off</span>
+              Reset
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="w-full min-w-max text-left">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="px-6 py-3 text-xs font-semibold text-slate-700">Vehicle Number</th>

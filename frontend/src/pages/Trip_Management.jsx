@@ -30,6 +30,22 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const formatApiError = (err, defaultMsg) => {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    if (typeof data === 'object') {
+      return Object.entries(data)
+        .map(([field, msgs]) => {
+          const fieldName = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          return `${fieldName}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+        })
+        .join('\n');
+    }
+    if (typeof data === 'string') return data;
+  }
+  return err.message || defaultMsg;
+};
+
 const TripManagement = () => {
   const location = useLocation();
   // ---------------------------------------------------------------------------
@@ -48,9 +64,8 @@ const TripManagement = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const q = params.get("search");
-    if (q) {
-      setSearchTerm(q);
-    }
+    setSearchTerm(q || "");
+    setCurrentPage(1);
     const action = params.get("action");
     if (action === "add") {
       setIsDrawerOpen(true);
@@ -114,14 +129,28 @@ const TripManagement = () => {
   const [activeLocationField, setActiveLocationField] = useState(null); // 'start' or 'end'
   const [formErrors, setFormErrors] = useState({});
 
+  const vehicleMap = useMemo(() => {
+    const map = {};
+    vehicles.forEach(v => {
+      map[String(v.vehicle_id)] = v.vehicle_number;
+    });
+    return map;
+  }, [vehicles]);
+
+  const driverMap = useMemo(() => {
+    const map = {};
+    drivers.forEach(d => {
+      map[String(d.driver_id)] = d.name;
+    });
+    return map;
+  }, [drivers]);
+
   const getVehicleNumber = (vId) => {
-    const found = vehicles.find(v => String(v.vehicle_id) === String(vId));
-    return found ? found.vehicle_number : (vId ? `Vehicle ${vId}` : 'Unassigned');
+    return vehicleMap[String(vId)] || (vId ? `Vehicle ${vId}` : 'Unassigned');
   };
 
   const getDriverName = (dId) => {
-    const found = drivers.find(d => String(d.driver_id) === String(dId));
-    return found ? found.name : (dId ? `Driver ${dId}` : 'Unassigned');
+    return driverMap[String(dId)] || (dId ? `Driver ${dId}` : 'Unassigned');
   };
 
   // ---------------------------------------------------------------------------
@@ -129,16 +158,20 @@ const TripManagement = () => {
   // ---------------------------------------------------------------------------
   const filteredTrips = useMemo(() => {
     return trips.filter((trip) => {
-      const matchesSearch =
-        String(getVehicleNumber(trip.vehicleId)).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(getDriverName(trip.driverName)).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(trip.startLocation).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(trip.endLocation).toLowerCase().includes(searchTerm.toLowerCase());
+      const q = searchTerm.trim().toLowerCase();
+      const matchesSearch = !q ||
+        String(trip.id || "").toLowerCase().includes(q) ||
+        String(`TMS${trip.id}`).toLowerCase().includes(q) ||
+        String(trip.status || "").toLowerCase().includes(q) ||
+        String(getVehicleNumber(trip.vehicleId)).toLowerCase().includes(q) ||
+        String(getDriverName(trip.driverName)).toLowerCase().includes(q) ||
+        String(trip.startLocation).toLowerCase().includes(q) ||
+        String(trip.endLocation).toLowerCase().includes(q);
       const matchesStatus =
         statusFilter === "All" || trip.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [trips, vehicles, drivers, searchTerm, statusFilter]);
+  }, [trips, vehicleMap, driverMap, searchTerm, statusFilter]);
 
   const stats = useMemo(() => {
     const totalTrips = trips.length;
@@ -220,8 +253,10 @@ const TripManagement = () => {
       try {
         await api.delete(`/trips/${id}/`);
         fetchTrips();
+        alert("Trip deleted successfully.");
       } catch (err) {
         console.error("Delete Error", err);
+        alert(formatApiError(err, "Failed to delete trip."));
       }
     }
   };
@@ -256,19 +291,17 @@ const TripManagement = () => {
 
       if (isEditMode) {
         await api.put(`/trips/${currentTrip.id}/`, formattedPayload);
+        alert('Trip updated successfully!');
       } else {
         await api.post("/trips/", formattedPayload);
+        alert('Trip created successfully!');
       }
       fetchTrips();
+      setCurrentPage(1);
       setIsDrawerOpen(false);
-      alert('Trip created successfully!');
     } catch (err) {
       console.error("Save Error", err);
-      if (err.response) {
-        alert("Backend Validation Error: " + JSON.stringify(err.response.data));
-      } else {
-        alert("Network Error: " + err.message + "\nAre you sure the backend server is running?");
-      }
+      alert(formatApiError(err, "Failed to save trip."));
     }
   };
 
@@ -301,43 +334,41 @@ const TripManagement = () => {
   const handleExportCSV = () => {
     const headers = [
       "ID",
-      "Vehicle ID",
+      "Vehicle Number",
       "Driver Name",
       "Start Location",
       "End Location",
       "Start Time",
       "End Time",
       "Status",
-      "Distance",
-      "Fuel Consumed",
+      "Distance (km)",
+      "Fuel Consumed (L)",
     ];
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [
-        headers.join(","),
-        ...trips.slice(0, 100).map((t) =>
-          [
-            t.id,
-            t.vehicleId,
-            t.driverName,
-            `"${t.startLocation}"`,
-            `"${t.endLocation}"`,
-            t.startTime,
-            t.endTime,
-            t.status,
-            t.distance,
-            t.fuelConsumed,
-          ].join(",")
-        ),
-      ].join("\n");
-
-    const encodedUri = encodeURI(csvContent);
+    const rows = [headers];
+    filteredTrips.forEach((t) => {
+      rows.push([
+        t.id,
+        getVehicleNumber(t.vehicleId),
+        getDriverName(t.driverName),
+        t.startLocation,
+        t.endLocation,
+        t.startTime,
+        t.endTime,
+        t.status,
+        t.distance,
+        t.fuelConsumed,
+      ]);
+    });
+    const csvContent = rows.map((e) => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "trips.csv");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "trips_report.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    alert("Trip report downloaded successfully!");
   };
 
   const handleImportCSV = (e) => {
@@ -473,11 +504,17 @@ const TripManagement = () => {
                 placeholder="Search by start/end location, vehicle, driver..."
                 className="w-full pl-10 pr-10 py-2 h-11 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white text-slate-900"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
               />
               {searchTerm && (
                 <button
-                  onClick={() => setSearchTerm("")}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setCurrentPage(1);
+                  }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-lg">close</span>
@@ -488,32 +525,34 @@ const TripManagement = () => {
               <select
                 className="select select-bordered w-full sm:w-48 pl-4 pr-10 py-2 h-11 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
               >
                 <option value="All">All Status</option>
                 <option value="Scheduled">Scheduled</option>
                 <option value="In Progress">In Progress</option>
                 <option value="Completed">Completed</option>
               </select>
-              {(statusFilter !== "All" || searchTerm !== "") && (
-                <button
-                  onClick={() => {
-                    setStatusFilter("All");
-                    setSearchTerm("");
-                  }}
-                  className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                >
-                  <span className="material-symbols-outlined text-base">filter_alt_off</span>
-                  Reset
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setStatusFilter("All");
+                  setSearchTerm("");
+                }}
+                disabled={statusFilter === "All" && searchTerm === ""}
+                className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 disabled:text-slate-400 font-semibold border border-red-200 disabled:border-slate-200 rounded-lg bg-red-50 disabled:bg-slate-100 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-base">filter_alt_off</span>
+                Reset
+              </button>
             </div>
           </div>
 
           {/* Trips List */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-max text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-sm uppercase">
                     <th className="p-4 font-medium">Vehicle / Driver</th>
@@ -753,7 +792,7 @@ const TripManagement = () => {
                   }
                 >
                   <option value="">Select a Vehicle</option>
-                  {vehicles.slice(0, 100).map(v => (
+                  {vehicles.map(v => (
                     <option key={v.vehicle_id} value={v.vehicle_id}>
                       {v.vehicle_number || `Vehicle ${v.vehicle_id}`}
                     </option>
@@ -780,7 +819,7 @@ const TripManagement = () => {
                   }
                 >
                   <option value="">Select a Driver</option>
-                  {drivers.slice(0, 100).map(d => (
+                  {drivers.map(d => (
                     <option key={d.driver_id} value={d.driver_id}>
                       {d.name || `Driver ${d.driver_id}`}
                     </option>

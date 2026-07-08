@@ -14,6 +14,22 @@ import {
   CalendarDays,
 } from "lucide-react";
 
+const formatApiError = (err, defaultMsg) => {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    if (typeof data === 'object') {
+      return Object.entries(data)
+        .map(([field, msgs]) => {
+          const fieldName = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          return `${fieldName}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+        })
+        .join('\n');
+    }
+    if (typeof data === 'string') return data;
+  }
+  return err.message || defaultMsg;
+};
+
 export default function VendorManagement() {
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
@@ -157,9 +173,15 @@ export default function VendorManagement() {
     setCurrentPage(1);
   };
 
-  const filteredVendors = vendors.filter((v) =>
-    String(v.name || "").toLowerCase().includes(search.trim().toLowerCase())
-  );
+  const filteredVendors = vendors.filter((v) => {
+    const q = search.trim().toLowerCase();
+    return !q ||
+      String(v.name || "").toLowerCase().includes(q) ||
+      String(v.service_type || "").toLowerCase().includes(q) ||
+      String(v.contact_person || "").toLowerCase().includes(q) ||
+      String(v.phone || "").toLowerCase().includes(q) ||
+      String(v.email || "").toLowerCase().includes(q);
+  });
 
   // PAGINATED vendors
   const paginatedVendors = filteredVendors.slice(
@@ -209,8 +231,10 @@ export default function VendorManagement() {
     try {
       if (editVendorId) {
         await api.put(`/vendors/${editVendorId}/`, payload);
+        alert("Vendor updated successfully!");
       } else {
         await api.post("/vendors/", payload);
+        alert("Vendor added successfully!");
       }
 
       setNewVendor({
@@ -225,12 +249,14 @@ export default function VendorManagement() {
       setEditVendorId(null);
       setShowModal(false);
       fetchVendors(); // Refresh full state and update dashboard KPI instantly
+      setCurrentPage(1);
     } catch (error) {
       console.error("Error saving vendor:", error);
       if (error.response && error.response.data) {
         // Map backend validation errors to frontend error state
         setFormErrors(error.response.data);
       }
+      alert(formatApiError(error, "Failed to save vendor."));
     } finally {
       setSaving(false);
     }
@@ -244,12 +270,16 @@ export default function VendorManagement() {
   };
 
   const handleDelete = async (id) => {
-    try {
-      await api.delete(`/vendors/${id}/`);
-      setShowDelete(null);
-      fetchVendors(); // Refresh full state and update dashboard KPI instantly
-    } catch (error) {
-      console.error("Error deleting vendor:", error);
+    if (window.confirm("Are you sure you want to delete this vendor?")) {
+      try {
+        await api.delete(`/vendors/${id}/`);
+        setShowDelete(null);
+        fetchVendors(); // Refresh full state and update dashboard KPI instantly
+        alert("Vendor deleted successfully.");
+      } catch (error) {
+        console.error("Error deleting vendor:", error);
+        alert(formatApiError(error, "Failed to delete vendor."));
+      }
     }
   };
 
@@ -260,8 +290,10 @@ export default function VendorManagement() {
     try {
       await api.patch(`/vendors/${id}/`, { status: updatedStatus });
       fetchVendors(); // Refresh full state and update dashboard KPI instantly
+      alert(`Vendor status updated to ${updatedStatus}.`);
     } catch (error) {
       console.error("Error updating status:", error);
+      alert(formatApiError(error, "Failed to update status."));
     }
   };
 
@@ -368,21 +400,34 @@ export default function VendorManagement() {
       </div>
 
       {/* Search Bar */}
-      <div className="flex items-center gap-3 p-3 bg-white shadow-sm border border-slate-100 rounded-xl mb-6">
-        <Search size={20} className="text-slate-400 ml-2" />
-        <input
-          type="text"
-          placeholder="Search vendor by name..."
-          value={search}
-          onChange={handleSearchChange}
-          className="w-full focus:outline-none text-sm text-slate-700 placeholder:text-slate-400"
-        />
+      <div className="flex items-center justify-between p-3 bg-white shadow-sm border border-slate-100 rounded-xl mb-6 relative">
+        <div className="flex items-center gap-3 flex-1">
+          <Search size={20} className="text-slate-400 ml-2" />
+          <input
+            type="text"
+            placeholder="Search vendor by name..."
+            value={search}
+            onChange={handleSearchChange}
+            className="w-full focus:outline-none text-sm text-slate-700 placeholder:text-slate-400 bg-white"
+          />
+        </div>
+        {search && (
+          <button
+            onClick={() => {
+              setSearch("");
+              setCurrentPage(1);
+            }}
+            className="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1 rounded-full hover:bg-slate-50 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Vendor Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
+          <table className="w-full min-w-max text-left text-sm border-collapse">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="py-4 px-6 font-semibold text-slate-500 whitespace-nowrap">Name</th>

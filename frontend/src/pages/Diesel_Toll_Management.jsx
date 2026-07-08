@@ -17,6 +17,22 @@ const FUEL_API_URL = "/fuel/";
 const TOLL_API_URL = "/toll/";
 
 
+const formatApiError = (err, defaultMsg) => {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    if (typeof data === 'object') {
+      return Object.entries(data)
+        .map(([field, msgs]) => {
+          const fieldName = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          return `${fieldName}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+        })
+        .join('\n');
+    }
+    if (typeof data === 'string') return data;
+  }
+  return err.message || defaultMsg;
+};
+
 export default function TransportFuelTollPage() {
   // ------------------------------------------------------------------
   // STATE
@@ -100,8 +116,8 @@ export default function TransportFuelTollPage() {
     if (filterDates.start && filterDates.end) {
       data = data.filter(item => item.date >= filterDates.start && item.date <= filterDates.end);
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
       data = data.filter(item => 
         String(getVehicleNumber(item.vehicle)).toLowerCase().includes(q)
       );
@@ -114,8 +130,8 @@ export default function TransportFuelTollPage() {
     if (filterDates.start && filterDates.end) {
       data = data.filter(item => item.date >= filterDates.start && item.date <= filterDates.end);
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
       data = data.filter(item => 
         String(getVehicleNumber(item.vehicle)).toLowerCase().includes(q) ||
         String(item.toll_name || "").toLowerCase().includes(q)
@@ -134,7 +150,9 @@ export default function TransportFuelTollPage() {
       .filter(Boolean)
       .sort();
 
-    return allDates.map((date) => ({
+    const recentDates = allDates.slice(-7);
+
+    return recentDates.map((date) => ({
       date,
       Fuel: fuelData
         .filter((f) => f.date === date)
@@ -158,24 +176,25 @@ export default function TransportFuelTollPage() {
 
   const exportReport = () => {
     const rows = [["Type", "Vehicle", "Litres/Amount", "Price/L", "Date"]];
-    fuelData.forEach((f) =>
+    fuelData.forEach((f) => {
+      const vNum = vehicles.find(v => String(v.vehicle_id) === String(f.vehicle))?.vehicle_number || f.vehicle;
       rows.push([
         "Fuel",
-        f.vehicle,
+        vNum,
         f.litres,
         f.price_per_litre,
-        f.date,
-      ])
-    );
-    tollData.forEach((t) =>
-      rows.push(["Toll", t.vehicle, t.amount, "", t.date])
-    );
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      rows.map((e) => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
+        f.date || "",
+      ]);
+    });
+    tollData.forEach((t) => {
+      const vNum = vehicles.find(v => String(v.vehicle_id) === String(t.vehicle))?.vehicle_number || t.vehicle;
+      rows.push(["Toll", vNum, t.amount, "", t.date || ""]);
+    });
+    const csvContent = rows.map((e) => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", "fuel_toll_report.csv");
     document.body.appendChild(link);
     link.click();
@@ -204,6 +223,27 @@ export default function TransportFuelTollPage() {
           className="h-16 w-auto rounded-md border border-slate-200 object-cover"
         />
       </div>
+    );
+  };
+
+  const isFuelFormInvalid = () => {
+    return (
+      !newFuel.vehicle ||
+      !newFuel.litres ||
+      Number(newFuel.litres) <= 0 ||
+      !newFuel.price_per_litre ||
+      Number(newFuel.price_per_litre) <= 0 ||
+      !newFuel.date
+    );
+  };
+
+  const isTollFormInvalid = () => {
+    return (
+      !newToll.vehicle ||
+      !newToll.toll_name ||
+      !newToll.amount ||
+      Number(newToll.amount) <= 0 ||
+      !newToll.date
     );
   };
 
@@ -255,11 +295,13 @@ export default function TransportFuelTollPage() {
           )
         );
         setEditingFuelId(null);
+        alert("Fuel entry updated successfully!");
       } else {
         const res = await api.post(FUEL_API_URL, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setFuelData((prev) => [res.data, ...prev]);
+        alert("Fuel entry added successfully!");
       }
 
       setNewFuel({
@@ -272,17 +314,20 @@ export default function TransportFuelTollPage() {
       setShowAddFuel(false);
     } catch (err) {
       console.error("Error saving fuel:", err.response?.data || err);
-      alert("Error saving fuel. Check console for details.");
+      alert(formatApiError(err, "Error saving fuel entry."));
     }
   };
 
   const deleteFuel = async (fuelId) => {
-    try {
-      await api.delete(`${FUEL_API_URL}${fuelId}/`);
-      setFuelData((prev) => prev.filter((f) => f.fuel_id !== fuelId));
-    } catch (err) {
-      console.error("Error deleting fuel:", err.response?.data || err);
-      alert("Error deleting fuel entry.");
+    if (window.confirm("Are you sure you want to delete this fuel entry?")) {
+      try {
+        await api.delete(`${FUEL_API_URL}${fuelId}/`);
+        setFuelData((prev) => prev.filter((f) => f.fuel_id !== fuelId));
+        alert("Fuel entry deleted successfully.");
+      } catch (err) {
+        console.error("Error deleting fuel:", err.response?.data || err);
+        alert(formatApiError(err, "Error deleting fuel entry."));
+      }
     }
   };
 
@@ -346,11 +391,13 @@ export default function TransportFuelTollPage() {
           )
         );
         setEditingTollId(null);
+        alert("Toll entry updated successfully!");
       } else {
         const res = await api.post(TOLL_API_URL, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setTollData((prev) => [res.data, ...prev]);
+        alert("Toll entry added successfully!");
       }
 
       setNewToll({
@@ -363,17 +410,20 @@ export default function TransportFuelTollPage() {
       setShowAddToll(false);
     } catch (err) {
       console.error("Error saving toll:", err.response?.data || err);
-      alert("Error saving toll. Check console for details.");
+      alert(formatApiError(err, "Error saving toll entry."));
     }
   };
 
   const deleteToll = async (tollId) => {
-    try {
-      await api.delete(`${TOLL_API_URL}${tollId}/`);
-      setTollData((prev) => prev.filter((t) => t.toll_id !== tollId));
-    } catch (err) {
-      console.error("Error deleting toll:", err.response?.data || err);
-      alert("Error deleting toll entry.");
+    if (window.confirm("Are you sure you want to delete this toll entry?")) {
+      try {
+        await api.delete(`${TOLL_API_URL}${tollId}/`);
+        setTollData((prev) => prev.filter((t) => t.toll_id !== tollId));
+        alert("Toll entry deleted successfully.");
+      } catch (err) {
+        console.error("Error deleting toll:", err.response?.data || err);
+        alert(formatApiError(err, "Error deleting toll entry."));
+      }
     }
   };
 
@@ -427,12 +477,20 @@ export default function TransportFuelTollPage() {
               type="text"
               placeholder="Search by Vehicle Number or Toll Plaza..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setFuelPage(1);
+                setTollPage(1);
+              }}
               className="w-full pl-10 pr-10 py-2 h-11 border border-slate-200 rounded-lg bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  setSearchQuery("");
+                  setFuelPage(1);
+                  setTollPage(1);
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
@@ -441,7 +499,11 @@ export default function TransportFuelTollPage() {
           </div>
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery("")}
+              onClick={() => {
+                setSearchQuery("");
+                setFuelPage(1);
+                setTollPage(1);
+              }}
               className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
               <span className="material-symbols-outlined text-base">filter_alt_off</span>
@@ -667,7 +729,11 @@ export default function TransportFuelTollPage() {
                         <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
                       ))}
                     </select>
-                    {fuelErrors.vehicle && <p className="text-red-500 text-xs mt-1">{fuelErrors.vehicle}</p>}
+                    {fuelErrors.vehicle ? (
+                      <p className="text-red-500 text-xs mt-1">{fuelErrors.vehicle}</p>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">Select the vehicle for this fueling transaction.</p>
+                    )}
                   </div>
 
                   <div>
@@ -688,7 +754,11 @@ export default function TransportFuelTollPage() {
                       className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${fuelErrors.litres ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
-                    {fuelErrors.litres && <p className="text-red-500 text-xs mt-1">{fuelErrors.litres}</p>}
+                    {fuelErrors.litres ? (
+                      <p className="text-red-500 text-xs mt-1">{fuelErrors.litres}</p>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">Enter fuel quantity in litres (e.g. 55.40, must be positive).</p>
+                    )}
                   </div>
 
                   <div>
@@ -709,7 +779,11 @@ export default function TransportFuelTollPage() {
                       className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${fuelErrors.price_per_litre ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
-                    {fuelErrors.price_per_litre && <p className="text-red-500 text-xs mt-1">{fuelErrors.price_per_litre}</p>}
+                    {fuelErrors.price_per_litre ? (
+                      <p className="text-red-500 text-xs mt-1">{fuelErrors.price_per_litre}</p>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">Enter fuel cost in ₹/litre (e.g. 96.50, must be positive).</p>
+                    )}
                   </div>
 
                   <div>
@@ -725,7 +799,11 @@ export default function TransportFuelTollPage() {
                       className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${fuelErrors.date ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
-                    {fuelErrors.date && <p className="text-red-500 text-xs mt-1">{fuelErrors.date}</p>}
+                    {fuelErrors.date ? (
+                      <p className="text-red-500 text-xs mt-1">{fuelErrors.date}</p>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">Purchase date of the fuel entry (YYYY-MM-DD).</p>
+                    )}
                   </div>
 
                   <div>
@@ -735,21 +813,34 @@ export default function TransportFuelTollPage() {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) =>
-                        setNewFuel({
-                          ...newFuel,
-                          photo: e.target.files && e.target.files[0],
-                        })
-                      }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-50 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (file) {
+                          const ext = file.name.split('.').pop().toLowerCase();
+                          if (!['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+                            alert("Unsupported file format. Only JPG, JPEG, PNG, and GIF are allowed.");
+                            e.target.value = "";
+                            return;
+                          }
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert("Oversized image file. Maximum size allowed is 2MB.");
+                            e.target.value = "";
+                            return;
+                          }
+                          setNewFuel({ ...newFuel, photo: file });
+                        }
+                      }}
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-50 cursor-pointer text-sm"
                     />
                     {renderPhotoPreview(newFuel.photo)}
+                    <p className="text-slate-400 text-xs mt-1">Supported formats: JPG, JPEG, PNG, GIF. Max size: 2MB.</p>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700"
+                  disabled={isFuelFormInvalid()}
+                  className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed cursor-pointer transition-all duration-200"
                 >
                   {editingFuelId ? "Update Entry" : "Save Entry"}
                 </button>
@@ -758,7 +849,7 @@ export default function TransportFuelTollPage() {
 
             {/* TABLE (Fuel) */}
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-max">
                 <thead className="bg-slate-50/80">
                   <tr>
                     <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">
@@ -952,7 +1043,11 @@ export default function TransportFuelTollPage() {
                         <option key={v.vehicle_id} value={v.vehicle_id}>{v.vehicle_number || `Vehicle ${v.vehicle_id}`}</option>
                       ))}
                     </select>
-                    {tollErrors.vehicle && <p className="text-red-500 text-xs mt-1">{tollErrors.vehicle}</p>}
+                    {tollErrors.vehicle ? (
+                      <p className="text-red-500 text-xs mt-1">{tollErrors.vehicle}</p>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">Select the vehicle for this toll transaction.</p>
+                    )}
                   </div>
 
                   <div>
@@ -971,7 +1066,11 @@ export default function TransportFuelTollPage() {
                       className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${tollErrors.toll_name ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
-                    {tollErrors.toll_name && <p className="text-red-500 text-xs mt-1">{tollErrors.toll_name}</p>}
+                    {tollErrors.toll_name ? (
+                      <p className="text-red-500 text-xs mt-1">{tollErrors.toll_name}</p>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">Enter toll plaza name (e.g. Pune-Mumbai Plaza, max 50 characters).</p>
+                    )}
                   </div>
 
                   <div>
@@ -992,7 +1091,11 @@ export default function TransportFuelTollPage() {
                       className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${tollErrors.amount ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
-                    {tollErrors.amount && <p className="text-red-500 text-xs mt-1">{tollErrors.amount}</p>}
+                    {tollErrors.amount ? (
+                      <p className="text-red-500 text-xs mt-1">{tollErrors.amount}</p>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">Enter toll fare amount in ₹ (e.g. 240, must be positive).</p>
+                    )}
                   </div>
 
                   <div>
@@ -1011,7 +1114,11 @@ export default function TransportFuelTollPage() {
                       className={`mt-1 w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400/30 ${tollErrors.date ? 'border-red-500' : 'border-slate-300'}`}
                       required
                     />
-                    {tollErrors.date && <p className="text-red-500 text-xs mt-1">{tollErrors.date}</p>}
+                    {tollErrors.date ? (
+                      <p className="text-red-500 text-xs mt-1">{tollErrors.date}</p>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">Date when toll payment was made (YYYY-MM-DD).</p>
+                    )}
                   </div>
 
                   <div>
@@ -1021,21 +1128,34 @@ export default function TransportFuelTollPage() {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) =>
-                        setNewToll({
-                          ...newToll,
-                          photo: e.target.files && e.target.files[0],
-                        })
-                      }
-                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-50 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (file) {
+                          const ext = file.name.split('.').pop().toLowerCase();
+                          if (!['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+                            alert("Unsupported file format. Only JPG, JPEG, PNG, and GIF are allowed.");
+                            e.target.value = "";
+                            return;
+                          }
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert("Oversized image file. Maximum size allowed is 2MB.");
+                            e.target.value = "";
+                            return;
+                          }
+                          setNewToll({ ...newToll, photo: file });
+                        }
+                      }}
+                      className="mt-1 w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-50 cursor-pointer text-sm"
                     />
                     {renderPhotoPreview(newToll.photo)}
+                    <p className="text-slate-400 text-xs mt-1">Supported formats: JPG, JPEG, PNG, GIF. Max size: 2MB.</p>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700"
+                  disabled={isTollFormInvalid()}
+                  className="mt-6 px-5 py-2.5 bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed cursor-pointer transition-all duration-200"
                 >
                   {editingTollId ? "Update Entry" : "Save Entry"}
                 </button>
@@ -1044,7 +1164,7 @@ export default function TransportFuelTollPage() {
 
             {/* TABLE (Toll) */}
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-max">
                 <thead className="bg-slate-50/80">
                   <tr>
                     <th className="py-4 px-6 text-left text-xs font-bold text-slate-600 uppercase tracking-wide">

@@ -1,5 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../utils/api';
+
+const formatApiError = (err, defaultMsg) => {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+    if (typeof data === 'object') {
+      return Object.entries(data)
+        .map(([field, msgs]) => {
+          const fieldName = field.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          return `${fieldName}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`;
+        })
+        .join('\n');
+    }
+    if (typeof data === 'string') return data;
+  }
+  return err.message || defaultMsg;
+};
 
 const EWayBillManagement = () => {
   // ============================================================
@@ -42,6 +58,7 @@ const EWayBillManagement = () => {
   const [lrBills, setLrBills] = useState([]);
 
   useEffect(() => {
+    document.title = "E-Way Bill";
     fetchEWayBills();
     fetchRelatedData();
   }, []);
@@ -49,9 +66,9 @@ const EWayBillManagement = () => {
   const fetchRelatedData = async () => {
     try {
       const [vRes, dRes, lRes] = await Promise.all([
-        api.get("/vehicles/"),
-        api.get("/drivers/"),
-        api.get("/lr-bilty/")
+        api.get("/vehicles/?options=true"),
+        api.get("/drivers/?options=true"),
+        api.get("/lr-bilty/?options=true")
       ]);
       setVehicles(vRes.data || []);
       setDrivers(dRes.data || []);
@@ -68,8 +85,35 @@ const EWayBillManagement = () => {
         const issueDate = b.added_date ? b.added_date.split('T')[0] : new Date().toISOString().split('T')[0];
         const issueTime = new Date(issueDate).getTime();
         const estDays = b.estimated_days || 30;
-        const expiryTime = issueTime + (estDays * 86400000);
+        const expiryTime = isNaN(issueTime) ? Date.now() + (estDays * 86400000) : issueTime + (estDays * 86400000);
         const daysLeft = Math.ceil((expiryTime - Date.now()) / 86400000);
+
+        let calculatedStatus = b.status || 'Active';
+        if (calculatedStatus === 'Active') {
+          if (daysLeft <= 0) {
+            calculatedStatus = 'Expired';
+          } else if (daysLeft <= 2) {
+            calculatedStatus = 'Expiring Soon';
+          }
+        }
+
+        let statusColor = 'bg-green-100 text-green-800';
+        if (calculatedStatus === 'Expired') {
+          statusColor = 'bg-red-100 text-red-800';
+        } else if (calculatedStatus === 'Expiring Soon') {
+          statusColor = 'bg-yellow-100 text-yellow-800';
+        } else if (calculatedStatus === 'Cancelled') {
+          statusColor = 'bg-orange-100 text-orange-800';
+        }
+
+        let expiryDateStr = issueDate;
+        try {
+          if (!isNaN(expiryTime)) {
+            expiryDateStr = new Date(expiryTime).toISOString().split('T')[0];
+          }
+        } catch (e) {
+          // Fallback to safe date
+        }
 
         return {
           id: b.eway_id,
@@ -89,11 +133,11 @@ const EWayBillManagement = () => {
           driver: b.driver || '',
           driverPhone: b.driver_phone || '',
           issueDate: issueDate,
-          expiryDate: new Date(expiryTime).toISOString().split('T')[0],
+          expiryDate: expiryDateStr,
           validDays: estDays,
           daysLeft: daysLeft,
-          status: b.status || 'Active',
-          statusColor: b.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800',
+          status: calculatedStatus,
+          statusColor: statusColor,
           createdAt: b.added_date ? new Date(b.added_date).toLocaleString() : '',
         };
       });
@@ -106,12 +150,20 @@ const EWayBillManagement = () => {
   // ============================================================
   // STATISTICS
   // ============================================================
+  const calculateTotalValue = () => {
+    const sum = ewayBills.reduce((acc, b) => {
+      const amtStr = String(b.amount).replace(/[₹,]/g, '').trim();
+      return acc + (parseFloat(amtStr) || 0);
+    }, 0);
+    return '₹' + sum.toLocaleString('en-IN');
+  };
+
   const statistics = {
     total: ewayBills.length,
     active: ewayBills.filter(b => b.status === 'Active').length,
     expiringSoon: ewayBills.filter(b => b.status === 'Expiring Soon').length,
     expired: ewayBills.filter(b => b.status === 'Expired').length,
-    totalValue: '₹24,60,000',
+    totalValue: calculateTotalValue(),
   };
 
   // ============================================================
@@ -123,29 +175,65 @@ const EWayBillManagement = () => {
     const estimatedDaysValue = Number(formData.estimatedDays);
     const gstinPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
-    if (!formData.invoiceNumber.trim()) errors.invoiceNumber = 'Invoice number is required';
-    if (!String(formData.lrNumber).trim()) errors.lrNumber = 'LR number is required';
-    if (!formData.supplierName.trim()) errors.supplierName = 'Supplier name is required';
+    if (!formData.invoiceNumber.trim()) {
+      errors.invoiceNumber = 'Invoice number is required';
+    } else if (/[^a-zA-Z0-9-]/.test(formData.invoiceNumber.trim())) {
+      errors.invoiceNumber = 'Invoice number cannot contain special characters';
+    }
+
+    if (!String(formData.lrNumber).trim()) {
+      errors.lrNumber = 'LR number is required';
+    }
+
+    if (!formData.supplierName.trim()) {
+      errors.supplierName = 'Supplier name is required';
+    } else if (!/^[a-zA-Z0-9\s,.-]+$/.test(formData.supplierName.trim())) {
+      errors.supplierName = 'Supplier name cannot contain mathematical characters or symbols';
+    }
+
     if (!formData.supplierGSTIN.trim()) {
       errors.supplierGSTIN = 'Supplier GSTIN is required';
     } else if (!gstinPattern.test(formData.supplierGSTIN.trim().toUpperCase())) {
       errors.supplierGSTIN = 'Enter a valid GSTIN';
     }
-    if (!formData.buyerName.trim()) errors.buyerName = 'Buyer name is required';
+
+    if (!formData.buyerName.trim()) {
+      errors.buyerName = 'Buyer name is required';
+    } else if (/\d/.test(formData.buyerName)) {
+      errors.buyerName = 'Buyer name cannot contain numbers';
+    } else if (!/^[a-zA-Z\s,.-]+$/.test(formData.buyerName.trim())) {
+      errors.buyerName = 'Buyer name cannot contain special characters';
+    }
+
     if (!formData.buyerGSTIN.trim()) {
       errors.buyerGSTIN = 'Buyer GSTIN is required';
     } else if (!gstinPattern.test(formData.buyerGSTIN.trim().toUpperCase())) {
       errors.buyerGSTIN = 'Enter a valid GSTIN';
     }
-    if (!formData.goodsDescription.trim()) errors.goodsDescription = 'Goods description is required';
+
+    if (!formData.goodsDescription.trim()) {
+      errors.goodsDescription = 'Goods description is required';
+    } else if (/[^\w\s,.-]/.test(formData.goodsDescription.trim())) {
+      errors.goodsDescription = 'Goods description cannot contain special characters';
+    }
+
     if (!formData.hsn_code.trim()) errors.hsn_code = 'HSN code is required';
+
     if (!formData.invoiceAmount.trim() || !Number.isFinite(invoiceAmountValue) || invoiceAmountValue <= 0) {
       errors.invoiceAmount = 'Invoice amount must be a positive number';
     }
+
     if (!String(formData.vehicleNumber).trim()) errors.vehicleNumber = 'Vehicle number is required';
     if (!formData.routeFrom.trim()) errors.routeFrom = 'Route From is required';
     if (!formData.routeTo.trim()) errors.routeTo = 'Route To is required';
     if (!String(formData.driverName).trim()) errors.driverName = 'Driver name is required';
+
+    if (!formData.driverPhone.trim()) {
+      errors.driverPhone = 'Driver phone is required';
+    } else if (!/^\d{10}$/.test(formData.driverPhone.trim().replace(/\D/g, ""))) {
+      errors.driverPhone = 'Driver phone must be exactly 10 digits';
+    }
+
     if (formData.estimatedDays && (!Number.isFinite(estimatedDaysValue) || estimatedDaysValue <= 0 || !Number.isInteger(estimatedDaysValue))) {
       errors.estimatedDays = 'Estimated days must be a whole number greater than 0';
     }
@@ -220,7 +308,7 @@ const EWayBillManagement = () => {
       alert('E-Way Bill generated successfully!');
     } catch (err) {
       console.error(err);
-      alert('Error generating E-Way Bill');
+      alert(formatApiError(err, 'Error generating E-Way Bill'));
     }
   };
 
@@ -237,6 +325,7 @@ const EWayBillManagement = () => {
         alert('E-Way Bill cancelled successfully');
       } catch (err) {
         console.error(err);
+        alert(formatApiError(err, 'Error cancelling E-Way Bill'));
       }
     }
   };
@@ -251,47 +340,80 @@ const EWayBillManagement = () => {
           alert('E-Way Bill extended successfully');
         } catch (err) {
           console.error(err);
+          alert(formatApiError(err, 'Error extending E-Way Bill'));
         }
       }
     }
   };
 
+  const downloadMockFile = (filename, content) => {
+    const element = document.createElement("a");
+    const file = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    element.href = URL.createObjectURL(file);
+    element.download = filename;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
   const handleDownloadQR = (bill) => {
-    alert(`Downloading QR Code for ${bill.id}\nQR Code: ${bill.qrCode}`);
+    downloadMockFile(`QR_${bill.ewaybillNumber}.txt`, `QR Code Content for E-Way Bill ${bill.ewaybillNumber}: ${bill.qrCode}`);
+    alert(`Downloaded QR Code for ${bill.ewaybillNumber}`);
   };
 
   const handleDownloadPDF = (bill) => {
-    alert(`Downloading PDF for E-Way Bill: ${bill.ewaybillNumber}`);
+    downloadMockFile(`EWayBill_${bill.ewaybillNumber}.pdf`, `PDF Content Mock for E-Way Bill: ${bill.ewaybillNumber}\nSupplier: ${bill.supplier}\nBuyer: ${bill.buyer}\nAmount: ${bill.amount}`);
+    alert(`Downloaded PDF for E-Way Bill ${bill.ewaybillNumber}`);
   };
 
+  const vehicleMap = useMemo(() => {
+    const map = {};
+    vehicles.forEach(v => {
+      map[String(v.vehicle_id)] = v.vehicle_number;
+    });
+    return map;
+  }, [vehicles]);
+
+  const driverMap = useMemo(() => {
+    const map = {};
+    drivers.forEach(d => {
+      map[String(d.driver_id)] = d.name;
+    });
+    return map;
+  }, [drivers]);
+
   const getVehicleNumber = (vId) => {
-    const found = vehicles.find(v => String(v.vehicle_id) === String(vId));
-    return found ? found.vehicle_number : `Vehicle ${vId}`;
+    return vehicleMap[String(vId)] || (vId ? `Vehicle ${vId}` : 'Unassigned');
   };
 
   const getDriverName = (dId) => {
-    const found = drivers.find(d => String(d.driver_id) === String(dId));
-    return found ? found.name : `Driver ${dId}`;
+    return driverMap[String(dId)] || (dId ? `Driver ${dId}` : 'Unassigned');
   };
 
   // ============================================================
   // FILTERING LOGIC
   // ============================================================
-  const filteredBills = ewayBills.filter(bill => {
-    const vNum = getVehicleNumber(bill.vehicle);
-    const dName = getDriverName(bill.driver);
-    const matchesSearch = 
-      String(bill.ewaybillNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(bill.invoiceNumber || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(bill.supplier || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(bill.buyer || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(vNum).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      String(dName).toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredBills = useMemo(() => {
+    return ewayBills.filter(bill => {
+      const vNum = getVehicleNumber(bill.vehicle);
+      const dName = getDriverName(bill.driver);
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = !q ||
+        String(bill.ewaybillNumber || "").toLowerCase().includes(q) ||
+        String(bill.invoiceNumber || "").toLowerCase().includes(q) ||
+        String(bill.supplier || "").toLowerCase().includes(q) ||
+        String(bill.buyer || "").toLowerCase().includes(q) ||
+        String(bill.supplier_gstin || "").toLowerCase().includes(q) ||
+        String(bill.buyer_gstin || "").toLowerCase().includes(q) ||
+        String(bill.status || "").toLowerCase().includes(q) ||
+        String(vNum).toLowerCase().includes(q) ||
+        String(dName).toLowerCase().includes(q);
 
-    const matchesStatus = filterStatus === 'all' || bill.status === filterStatus;
+      const matchesStatus = filterStatus === 'all' || bill.status === filterStatus;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    });
+  }, [ewayBills, searchQuery, filterStatus, vehicleMap, driverMap]);
 
   // ============================================================
   // RENDER: STATISTICS CARDS
@@ -337,7 +459,7 @@ const EWayBillManagement = () => {
       <div className="rounded-xl p-5 bg-white shadow-sm hover:shadow-lg transition-all border border-slate-100">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-slate-600 text-sm font-medium">Expired</p>
+            <p className="text-slate-600 text-sm font-medium">Expired Bills</p>
             <p className="text-slate-900 text-2xl font-bold mt-1">{statistics.expired}</p>
           </div>
           <div className="p-3 rounded-lg bg-red-500/10">
@@ -366,21 +488,21 @@ const EWayBillManagement = () => {
   const renderGenerateModal = () => (
     <>
       {showGenerateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl my-8 w-full max-w-4xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl my-8 w-full max-w-4xl max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-slate-200">
               <h2 className="text-xl font-bold text-slate-900">Generate New E-Way Bill</h2>
               <button
                 onClick={() => setShowGenerateModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition"
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleGenerateBill} className="p-6 space-y-6 max-h-96 overflow-y-auto">
+            <form onSubmit={handleGenerateBill} className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* Invoice & LR Section */}
               <div className="border-b pb-6">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Invoice & LR Details</h3>
@@ -632,15 +754,18 @@ const EWayBillManagement = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Driver Phone</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Driver Phone <span className="text-red-500">*</span></label>
                     <input
                       type="tel"
                       name="driverPhone"
                       value={formData.driverPhone}
                       onChange={handleFormChange}
                       placeholder="e.g., 9876543210"
-                      className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary"
+                      className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary ${
+                        formErrors.driverPhone ? 'border-red-500' : 'border-slate-300'
+                      }`}
                     />
+                    {formErrors.driverPhone && <p className="text-red-500 text-xs mt-1">{formErrors.driverPhone}</p>}
                   </div>
                 </div>
               </div>
@@ -674,8 +799,8 @@ const EWayBillManagement = () => {
   const renderDetailsModal = () => (
     <>
       {showDetailsModal && selectedBill && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl my-8 w-full max-w-3xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl my-8 w-full max-w-3xl max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-slate-200 bg-linear-to-r from-primary/5 to-accent-cyan/5">
               <div>
@@ -691,19 +816,49 @@ const EWayBillManagement = () => {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
-              {/* Status */}
-              <div className="flex items-center justify-between">
-                <span className={`px-4 py-2 rounded-full text-sm font-semibold ${selectedBill.statusColor}`}>
-                  {selectedBill.status}
-                </span>
-                <div className="text-right">
-                  <p className="text-sm text-slate-600">Days Left</p>
-                  <p className={`text-2xl font-bold ${selectedBill.daysLeft < 1 ? 'text-red-600' : selectedBill.daysLeft < 10 ? 'text-yellow-600' : 'text-green-600'}`}>
-                    {selectedBill.daysLeft}
-                  </p>
-                </div>
-              </div>
+             <div className="p-6 space-y-6 overflow-y-auto flex-1">
+               {/* Status */}
+               <div className="flex items-center justify-between gap-4">
+                 <div className="flex-1 max-w-[200px]">
+                   <label className="block text-xs font-semibold text-slate-500 mb-1">Status</label>
+                   <select
+                     value={selectedBill.status}
+                     onChange={async (e) => {
+                       const newStatus = e.target.value;
+                       try {
+                         await api.patch(`/eway-bills/${selectedBill.id}/`, { status: newStatus });
+                         fetchEWayBills();
+                         setSelectedBill(prev => ({
+                           ...prev,
+                           status: newStatus,
+                           statusColor: newStatus === 'Active' ? 'bg-green-100 text-green-800' :
+                                        newStatus === 'Cancelled' ? 'bg-orange-100 text-orange-800' :
+                                        newStatus === 'Expired' ? 'bg-red-100 text-red-800' :
+                                        newStatus === 'Expiring Soon' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-slate-100 text-slate-800'
+                         }));
+                         alert("Status updated successfully!");
+                       } catch (err) {
+                         console.error(err);
+                         alert(formatApiError(err, "Failed to update status"));
+                       }
+                     }}
+                     className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                   >
+                     <option value="Active">Active</option>
+                     <option value="Cancelled">Cancelled</option>
+                     <option value="Expired">Expired</option>
+                     <option value="Expiring Soon">Expiring Soon</option>
+                     <option value="Critical">Critical</option>
+                   </select>
+                 </div>
+                 <div className="text-right">
+                   <p className="text-sm text-slate-600">Days Left</p>
+                   <p className={`text-2xl font-bold ${selectedBill.daysLeft < 1 ? 'text-red-600' : selectedBill.daysLeft < 10 ? 'text-yellow-600' : 'text-green-600'}`}>
+                     {selectedBill.daysLeft}
+                   </p>
+                 </div>
+               </div>
 
               <div className="border-t border-slate-200 pt-6">
                 <h3 className="font-semibold text-slate-900 mb-4">E-Way Bill Information</h3>
@@ -871,12 +1026,18 @@ const EWayBillManagement = () => {
               type="text"
               placeholder="Search by E-Way Bill number, invoice number, supplier, or buyer..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full pl-10 pr-10 py-2.5 h-11 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
@@ -886,7 +1047,10 @@ const EWayBillManagement = () => {
           <div className="flex gap-2 w-full md:w-auto items-center">
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-4 pr-10 py-2.5 h-11 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-900"
             >
               <option value="all">All Status</option>
@@ -896,57 +1060,57 @@ const EWayBillManagement = () => {
               <option value="Expired">Expired</option>
               <option value="Cancelled">Cancelled</option>
             </select>
-            {(filterStatus !== 'all' || searchQuery !== '') && (
-              <button
-                onClick={() => {
-                  setFilterStatus('all');
-                  setSearchQuery('');
-                }}
-                className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 font-semibold border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-              >
-                <span className="material-symbols-outlined text-base">filter_alt_off</span>
-                Reset
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setFilterStatus('all');
+                setSearchQuery('');
+                setCurrentPage(1);
+              }}
+              disabled={filterStatus === 'all' && searchQuery === ''}
+              className="px-4 py-2.5 h-11 text-sm text-red-600 hover:text-red-700 disabled:text-slate-400 font-semibold border border-red-200 disabled:border-slate-200 rounded-lg bg-red-50 disabled:bg-slate-100 hover:bg-red-100 transition-colors flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-base">filter_alt_off</span>
+              Reset
+            </button>
           </div>
         </div>
       </div>
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="w-full min-w-max text-left">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-3 text-xs font-semibold text-slate-700">EWB Number</th>
-              <th className="px-6 py-3 text-xs font-semibold text-slate-700">Supplier</th>
-              <th className="px-6 py-3 text-xs font-semibold text-slate-700">Buyer</th>
-              <th className="px-6 py-3 text-xs font-semibold text-slate-700">Amount</th>
-              <th className="px-6 py-3 text-xs font-semibold text-slate-700">Vehicle</th>
-              <th className="px-6 py-3 text-xs font-semibold text-slate-700">Days Left</th>
-              <th className="px-6 py-3 text-xs font-semibold text-slate-700">Status</th>
-              <th className="px-6 py-3 text-xs font-semibold text-slate-700">Actions</th>
+              <th className="px-6 py-3 text-xs font-semibold text-slate-700 text-center">EWB Number</th>
+              <th className="px-6 py-3 text-xs font-semibold text-slate-700 text-center">Supplier</th>
+              <th className="px-6 py-3 text-xs font-semibold text-slate-700 text-center">Buyer</th>
+              <th className="px-6 py-3 text-xs font-semibold text-slate-700 text-center">Amount</th>
+              <th className="px-6 py-3 text-xs font-semibold text-slate-700 text-center">Vehicle</th>
+              <th className="px-6 py-3 text-xs font-semibold text-slate-700 text-center">Days Left</th>
+              <th className="px-6 py-3 text-xs font-semibold text-slate-700 text-center">Status</th>
+              <th className="px-6 py-3 text-xs font-semibold text-slate-700 text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredBills.length > 0 ? (
               filteredBills.slice((currentPage - 1) * 10, currentPage * 10).map((bill, index) => (
                 <tr key={index} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                  <td className="px-6 py-4 text-sm font-semibold text-primary cursor-pointer hover:underline">{bill.ewaybillNumber}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{bill.supplier}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{bill.buyer}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-slate-900">{bill.amount}</td>
-                  <td className="px-6 py-4 text-sm text-slate-700">{vehicles.find(v => String(v.vehicle_id) === String(bill.vehicle))?.vehicle_number || bill.vehicle}</td>
-                  <td className="px-6 py-4 text-sm font-semibold">
+                  <td className="px-6 py-4 text-sm font-semibold text-primary cursor-pointer hover:underline text-center" onClick={() => handleViewDetails(bill)}>{bill.ewaybillNumber}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700 text-center">{bill.supplier}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700 text-center">{bill.buyer}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-slate-900 text-center">{bill.amount}</td>
+                  <td className="px-6 py-4 text-sm text-slate-700 text-center">{vehicles.find(v => String(v.vehicle_id) === String(bill.vehicle))?.vehicle_number || bill.vehicle}</td>
+                  <td className="px-6 py-4 text-sm font-semibold text-center">
                     <span className={`${bill.daysLeft < 1 ? 'text-red-600' : bill.daysLeft < 10 ? 'text-yellow-600' : 'text-green-600'}`}>
                       {bill.daysLeft}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 text-center">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${bill.statusColor}`}>
                       {bill.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px-6 py-4 text-sm text-center">
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleViewDetails(bill)}
@@ -992,13 +1156,14 @@ const EWayBillManagement = () => {
           Showing {Math.min(filteredBills.length, (currentPage - 1) * 10 + 1)} to {Math.min(filteredBills.length, currentPage * 10)} of {filteredBills.length} bills
         </span>
         <div className="flex gap-2">
-          <button 
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
+          {currentPage > 1 && (
+            <button 
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              className="px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              Previous
+            </button>
+          )}
           <button className="px-3 py-1 text-sm font-medium bg-indigo-600 text-white rounded-lg">
             {currentPage}
           </button>
@@ -1023,19 +1188,33 @@ const EWayBillManagement = () => {
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <div>
           <h1 className="text-slate-900 text-2xl lg:text-3xl font-black leading-tight tracking-[-0.033em]">
-            E-Way Bill Management
+            E-Way Bill
           </h1>
           <p className="text-slate-600 text-sm lg:text-base mt-1">
             Manage and track e-way bills for GST compliance
           </p>
         </div>
-        <button
-          onClick={() => setShowGenerateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          <span className="material-symbols-outlined text-base">add_circle</span>
-          Generate E-Way Bill
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              const csvContent = "E-Way Bill Number,Invoice Number,Supplier,Buyer,Amount,Status\n" +
+                ewayBills.map(b => `${b.ewaybillNumber},${b.invoiceNumber},${b.supplier},${b.buyer},${b.amount},${b.status}`).join("\n");
+              downloadMockFile("eway_bills_report.csv", csvContent);
+              alert("Downloaded E-Way Bills Report successfully");
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">download</span>
+            Download Report
+          </button>
+          <button
+            onClick={() => setShowGenerateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">add_circle</span>
+            Generate E-Way Bill
+          </button>
+        </div>
       </div>
 
       {/* Statistics Cards */}

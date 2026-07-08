@@ -17,7 +17,13 @@ from django.db import connection
 def seed():
     print("Seeding database...")
     with connection.cursor() as cursor:
-        cursor.execute("PRAGMA foreign_keys = OFF;")
+        if connection.vendor == 'mysql':
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
+        else:
+            try:
+                cursor.execute("PRAGMA foreign_keys = OFF;")
+            except Exception:
+                pass
     
     # 1. System Settings
     if not SystemSetting.objects.exists():
@@ -164,14 +170,15 @@ def seed():
 
     # 10. Finance Transactions
     FinanceTransaction.objects.all().delete()
-    for i in range(10):
+    for i in range(15):  # Increase to 15 to ensure plenty of data for each month
         t_type = "Income" if i % 2 == 0 else "Expense"
         cat = "Freight Income" if t_type == "Income" else ("Fuel" if i % 3 == 0 else "Toll")
         desc = f"Received freight payment for LR-{10000+(i//2)}" if t_type == "Income" else f"Paid {cat} charge"
         status = "Pending" if i in [3, 7] else "Completed"
+        txn_date = date.today() - timedelta(days=28 * (i % 5))  # Distribute across 5 months
         FinanceTransaction.objects.create(
-            date=date.today(), type=t_type,
-            description=desc, amount=float(25000 - i*1500) if t_type == "Income" else float(5000 + i*500),
+            date=txn_date, type=t_type,
+            description=desc, amount=float(35000 - i*1500) if t_type == "Income" else float(8000 + i*500),
             status=status, category=cat,
             vehicle=vehicles[i%5], trip=trips[i%5], vendor=vendors[i%5]
         )
@@ -210,6 +217,15 @@ def seed():
                 status="Moving"
             )
         print("Created Tracking Logs")
+
+    with connection.cursor() as cursor:
+        if connection.vendor == 'mysql':
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
+        else:
+            try:
+                cursor.execute("PRAGMA foreign_keys = ON;")
+            except Exception:
+                pass
 
     print("Database seeding completed successfully!")
 

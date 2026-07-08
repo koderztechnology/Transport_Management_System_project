@@ -316,12 +316,22 @@ export default function TrackingAnalyticsFull() {
               <h3 className="font-semibold">Vehicles</h3>
               <span className="text-xs text-slate-400">{vehicles.length}</span>
             </div>
-            <input
-              value={searchVehicle}
-              onChange={(e) => setSearchVehicle(e.target.value)}
-              placeholder="Search vehicle/reg/driver..."
-              className="w-full border rounded-md px-3 py-2 mb-3"
-            />
+            <div className="relative mb-3">
+              <input
+                value={searchVehicle}
+                onChange={(e) => setSearchVehicle(e.target.value)}
+                placeholder="Search vehicle/reg/driver..."
+                className="w-full border rounded-md pl-3 pr-8 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              {searchVehicle && (
+                <button
+                  onClick={() => setSearchVehicle("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+              )}
+            </div>
 
             <div className="h-64 overflow-auto space-y-2">
               {vehicles

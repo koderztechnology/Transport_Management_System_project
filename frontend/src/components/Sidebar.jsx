@@ -20,8 +20,8 @@ const Sidebar = () => {
       title: 'Finance & Billing',
       items: [
         { name: 'Diesel & Toll', icon: 'local_gas_station', href: '/diesel-toll-management' },
-        { name: 'LR / Bilty & Billing', icon: 'receipt_long', href: '/lr-management' },
-        { name: 'E-Way Bill', icon: 'description', href: '/eway-bill-management' },
+        { name: 'LR / Bility & Billing', icon: 'receipt_long', href: '/lr-bilty-billing' },
+        { name: 'E-Way Bill', icon: 'description', href: '/eway-bill' },
         { name: 'Accounts & Finance', icon: 'account_balance_wallet', href: '/accounts-finance' },
       ]
     },
@@ -49,8 +49,8 @@ const Sidebar = () => {
         '/trip-management': ['Manager', 'Driver'],
         '/driver-management': ['Manager', 'Driver'],
         '/diesel-toll-management': ['Manager'],
-        '/lr-management': ['Manager'],
-        '/eway-bill-management': ['Manager'],
+        '/lr-bilty-billing': ['Manager'],
+        '/eway-bill': ['Manager'],
         '/accounts-finance': ['Manager', 'Vendor'],
         '/vendor-management': ['Manager', 'Vendor'],
         '/inventory': ['Manager'],

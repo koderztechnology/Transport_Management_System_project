@@ -11,6 +11,8 @@ class UserProfile(models.Model):
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Admin')
+    failed_login_attempts = models.IntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'user_profile'
@@ -33,6 +35,8 @@ class Driver(models.Model):
     JOB_TYPE_CHOICES = [
         ('Full-time', 'Full-time'),
         ('Part-time', 'Part-time'),
+        ('Contract', 'Contract'),
+        ('Temporary', 'Temporary'),
     ]
 
     driver_id = models.AutoField(primary_key=True)
