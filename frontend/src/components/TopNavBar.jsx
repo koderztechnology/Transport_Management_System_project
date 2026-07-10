@@ -19,14 +19,35 @@ const TopNavBar = () => {
   useEffect(() => {
     const fetchSearchData = async () => {
       try {
-        const [dRes, vRes, tRes] = await Promise.all([
-          api.get('/drivers/'),
-          api.get('/vehicles/'),
-          api.get('/trips/')
-        ]);
-        setDrivers(dRes.data || []);
-        setVehicles(vRes.data || []);
-        setTrips(tRes.data || []);
+        const userRole = localStorage.getItem('user_role') || 'Admin';
+        const role = userRole.trim().toLowerCase();
+
+        const fetchDrivers = (role === 'admin' || role === 'manager');
+        const fetchVehicles = (role === 'admin' || role === 'manager' || role === 'driver');
+        const fetchTrips = (role === 'admin' || role === 'manager' || role === 'driver');
+
+        const promises = [];
+        if (fetchDrivers) {
+          promises.push(api.get('/drivers/').then(res => ({ type: 'drivers', data: res.data })));
+        }
+        if (fetchVehicles) {
+          promises.push(api.get('/vehicles/').then(res => ({ type: 'vehicles', data: res.data })));
+        }
+        if (fetchTrips) {
+          promises.push(api.get('/trips/').then(res => ({ type: 'trips', data: res.data })));
+        }
+
+        if (promises.length === 0) return;
+
+        const results = await Promise.allSettled(promises);
+        results.forEach(result => {
+          if (result.status === 'fulfilled') {
+            const { type, data } = result.value;
+            if (type === 'drivers') setDrivers(data || []);
+            if (type === 'vehicles') setVehicles(data || []);
+            if (type === 'trips') setTrips(data || []);
+          }
+        });
       } catch (err) {
         console.error("Error loading search data:", err);
       }

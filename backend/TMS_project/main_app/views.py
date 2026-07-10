@@ -440,7 +440,12 @@ def dashboard_summary(request):
             {
                 'title': 'Monthly Profit',
                 'value': format_indian_currency(monthly_profit),
-                'change': '+0%', 'trend': 'up', 'icon': 'trending_up', 'iconBg': 'bg-green-500/10', 'iconColor': 'text-green-500', 'status': 'good'
+                'change': '+0%' if monthly_profit >= 0 else '-0%',
+                'trend': 'up' if monthly_profit >= 0 else 'down',
+                'icon': 'trending_up' if monthly_profit >= 0 else 'trending_down',
+                'iconBg': 'bg-green-500/10' if monthly_profit >= 0 else 'bg-red-500/10',
+                'iconColor': 'text-green-500' if monthly_profit >= 0 else 'text-red-500',
+                'status': 'good' if monthly_profit >= 0 else 'warning'
             }
         ]
 
