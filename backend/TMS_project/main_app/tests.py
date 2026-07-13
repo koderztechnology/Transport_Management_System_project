@@ -31,11 +31,11 @@ class AdminAuthTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('Username must be at least 5 characters', response.json()['error'])
 
-        # Username has spaces (should fail validation because we enforce alphanumeric/underscore)
+        # Username has special characters (should fail validation because we enforce alphanumeric/underscore/spaces)
         response = self.client.post(self.signup_url, {
-            'username': 'user name',
+            'username': 'user@name',
             'password': 'password123',
-            'email': 'space@example.com'
+            'email': 'special@example.com'
         }, content_type='application/json')
         self.assertEqual(response.status_code, 400)
 

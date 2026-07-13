@@ -631,8 +631,8 @@ def admin_signup(request):
     if len(username) > 30:
         return Response({'error': 'Username cannot exceed 30 characters.'}, status=400)
         
-    if not re.match(r'^[a-zA-Z0-9_]+$', username):
-        return Response({'error': 'Username can only contain letters, numbers, and underscores.'}, status=400)
+    if not re.match(r'^[a-zA-Z0-9_ ]+$', username):
+        return Response({'error': 'Username can only contain letters, numbers, underscores, and spaces.'}, status=400)
         
     if User.objects.filter(username=username).exists():
         return Response({'error': 'Username already exists.'}, status=400)

@@ -61,9 +61,7 @@ const Login = () => {
 
   const handleFieldChange = (field, value) => {
     if (field === 'username') {
-      // Stripping spaces dynamically on the fly to prevent spaces/whitespace-only input
-      const cleanValue = value.replace(/\s/g, '');
-      setUsername(cleanValue);
+      setUsername(value);
     } else {
       setPassword(value);
     }

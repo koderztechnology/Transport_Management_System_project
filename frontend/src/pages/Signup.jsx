@@ -20,7 +20,7 @@ const Signup = () => {
     if (!val) return 'Username is required.';
     if (val.length < 5) return 'Username must be at least 5 characters.';
     if (val.length > 30) return 'Username cannot exceed 30 characters.';
-    if (!/^[a-zA-Z0-9_]+$/.test(val)) return 'Username can only contain letters, numbers, and underscores.';
+    if (!/^[a-zA-Z0-9_ ]+$/.test(val)) return 'Username can only contain letters, numbers, underscores, and spaces.';
     return '';
   };
 
@@ -93,8 +93,7 @@ const Signup = () => {
   const handleFieldChange = (field, value) => {
     let cleanValue = value;
     if (field === 'username') {
-      cleanValue = value.replace(/\s/g, '');
-      setUsername(cleanValue);
+      setUsername(value);
     } else if (field === 'email') {
       cleanValue = value.replace(/\s/g, '');
       setEmail(cleanValue);
