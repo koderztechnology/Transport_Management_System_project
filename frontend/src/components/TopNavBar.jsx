@@ -12,6 +12,8 @@ const TopNavBar = () => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const profileRef = useRef(null);
   const notifRef = useRef(null);
@@ -252,11 +254,15 @@ const TopNavBar = () => {
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHZwNnLvTNo4dgOWNi958tH9rGfiYDy1F_VwxrCMELhBoeLHHBeXdPYzHrkjbJzsN0b5ku8aampuarIt48Iz29zWjEqAoE5euu1tbM8Km6BfstHgjD1JUcWUAQtX0TsBp0FvHvkk50K2-8fovfpl4m_h58isHwVHufPuL71l3CCaW_CwUU4HiPP2GuFl_SFEaO-b-4PnqJyxqkf01wU2YyH7D_x0GgF_QP4CePjyJZI5j_FvKE1BBHYmE9AcYbg8LQqNNh3obOb4k"
               alt=""
               className="w-full h-full object-cover"
+              onLoad={() => setImgLoaded(true)}
               onError={(e) => {
                 e.target.style.display = 'none'; // Hide broken image to let initials show
+                setImgFailed(true);
               }}
             />
-            <span className="absolute">{username.charAt(0).toUpperCase()}</span>
+            {(!imgLoaded || imgFailed) && (
+              <span className="absolute">{username.charAt(0).toUpperCase()}</span>
+            )}
           </button>
           {showDropdown && (
             <div className="absolute right-0 top-12 w-48 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50">
