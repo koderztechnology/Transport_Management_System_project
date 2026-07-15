@@ -9,14 +9,11 @@ const TopNavBar = () => {
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
 
-  const [notifications, setNotifications] = useState([]);
-  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
 
   const profileRef = useRef(null);
-  const notifRef = useRef(null);
 
   useEffect(() => {
     const fetchSearchData = async () => {
@@ -58,26 +55,9 @@ const TopNavBar = () => {
   }, []);
 
   useEffect(() => {
-    const fetchNotifs = async () => {
-      try {
-        const username = localStorage.getItem('admin_username') || '';
-        const userRole = localStorage.getItem('user_role') || 'Admin';
-        const res = await api.get(`/dashboard/?username=${username}&role=${userRole}`);
-        setNotifications(res.data.notifications || []);
-      } catch (err) {
-        console.error("Error loading notifications:", err);
-      }
-    };
-    fetchNotifs();
-  }, []);
-
-  useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setShowDropdown(false);
-      }
-      if (notifRef.current && !notifRef.current.contains(event.target)) {
-        setShowNotifDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -150,9 +130,7 @@ const TopNavBar = () => {
     }
   };
 
-  const handleMarkAllRead = () => {
-    setNotifications([]);
-  };
+
 
   const username = localStorage.getItem('admin_username') || 'Admin';
   const userRole = localStorage.getItem('user_role') || 'Administrator';
@@ -190,58 +168,6 @@ const TopNavBar = () => {
         </form>
       </div>
       <div className="flex items-center gap-4 relative">
-        {/* Notification Bell */}
-        <div ref={notifRef} className="relative">
-          <button
-            onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-            className="relative flex items-center justify-center p-2 rounded-full border border-slate-200 hover:border-indigo-500 transition-all cursor-pointer text-slate-600 hover:text-indigo-600 focus:outline-none"
-            aria-label="Notifications"
-          >
-            <span className="material-symbols-outlined text-[22px]">notifications</span>
-            {notifications.length > 0 && (
-              <span className="absolute top-1 right-1 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-              </span>
-            )}
-          </button>
-          
-          {showNotifDropdown && (
-            <div className="absolute right-0 top-12 w-80 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-                <span className="text-sm font-bold text-slate-800">Notifications</span>
-                {notifications.length > 0 && (
-                  <button
-                    onClick={handleMarkAllRead}
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
-                  >
-                    Mark all read
-                  </button>
-                )}
-              </div>
-              <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
-                {notifications.length > 0 ? (
-                  notifications.map((n, idx) => (
-                    <div key={idx} className="p-4 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${n.severity === 'high' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                          {n.title}
-                        </span>
-                        <span className="text-[10px] text-slate-400 whitespace-nowrap">{n.time}</span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{n.message}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-8 px-4 text-center text-slate-500">
-                    <span className="material-symbols-outlined text-3xl text-slate-300 block mb-1">notifications_off</span>
-                    <span className="text-xs font-medium">No new notifications</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Profile Avatar */}
         <div ref={profileRef} className="relative">
