@@ -54,7 +54,7 @@ const Sidebar = () => {
         '/accounts-finance': ['Manager', 'Vendor'],
         '/vendor-management': ['Manager', 'Vendor'],
         '/inventory': ['Manager'],
-        '/tracking-analytics': ['Manager', 'Driver'],
+        '/tracking-analytics': ['Manager'],
         '/system-settings': [],
     };
     if (href === '/' || href.startsWith('#')) return true;

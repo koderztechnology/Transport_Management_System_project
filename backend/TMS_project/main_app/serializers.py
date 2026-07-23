@@ -45,13 +45,18 @@ class DriverSerializer(serializers.ModelSerializer):
         if value:
             import re
             cleaned = re.sub(r'\D', '', value)
+            if len(cleaned) == 12 and cleaned.startswith('91'):
+                cleaned = cleaned[2:]
+            elif len(cleaned) == 11 and cleaned.startswith('0'):
+                cleaned = cleaned[1:]
             if len(cleaned) != 10:
                 raise serializers.ValidationError("Phone number must be exactly 10 digits.")
-            qs = Driver.objects.filter(phone=value)
+            qs = Driver.objects.filter(phone=cleaned)
             if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError("A driver with this phone number already exists.")
+            return cleaned
         return value
 
     def validate_license(self, value):
@@ -178,6 +183,22 @@ class VehicleSerializer(serializers.ModelSerializer):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError("A vehicle with this number already exists.")
+        return value
+
+    def validate_chassis_number(self, value):
+        if value:
+            import re
+            cleaned = value.strip().upper()
+            if not re.match(r'^[A-Z0-9]+$', cleaned):
+                raise serializers.ValidationError("Special characters are not allowed.")
+            if len(cleaned) != 17:
+                raise serializers.ValidationError("Chassis number must be exactly 17 characters.")
+            
+            qs = Vehicle.objects.filter(chassis_number__iexact=cleaned)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError("A vehicle with this chassis number already exists.")
         return value
 
 class TripSerializer(serializers.ModelSerializer):

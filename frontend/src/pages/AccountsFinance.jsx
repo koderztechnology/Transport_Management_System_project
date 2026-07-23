@@ -20,6 +20,7 @@ const formatApiError = (err, defaultMsg) => {
 
 const AccountsFinance = () => {
   const location = useLocation();
+  const userRole = localStorage.getItem('user_role') || 'Admin';
   // ========================================
   // STATE MANAGEMENT
   // ========================================
@@ -530,26 +531,28 @@ const AccountsFinance = () => {
         
         {/* Primary actions in header */}
         <div className="flex items-center gap-3">
-          <button 
-            onClick={handleDownloadReport}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-base">download</span>
-            Download Report
-          </button>
+          {userRole !== 'Vendor' && (
+            <button 
+              onClick={handleDownloadReport}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">download</span>
+              Download Report
+            </button>
+          )}
           <button 
             onClick={handleAddExpense}
-            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined text-base">remove</span>
-            Add Expense
+            {userRole === 'Vendor' ? 'Update Payment' : 'Add Expense'}
           </button>
           <button 
             onClick={handleAddIncome}
-            className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined text-base">add</span>
-            Add Income
+            {userRole === 'Vendor' ? 'Invoice' : 'Add Income'}
           </button>
         </div>
       </div>
@@ -886,10 +889,18 @@ const AccountsFinance = () => {
             <div className="sticky top-0 bg-white p-5 border-b border-slate-200 flex items-center justify-between z-10">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">
-                  {isEditMode 
-                    ? `Edit ${modalType === 'income' ? 'Income' : 'Expense'}` 
-                    : `Add ${modalType === 'income' ? 'Income' : 'Expense'}`
-                  }
+                  {(() => {
+                    if (userRole === 'Vendor') {
+                      if (isEditMode) {
+                        return `Edit ${modalType === 'income' ? 'Invoice' : 'Payment'}`;
+                      } else {
+                        return `Add ${modalType === 'income' ? 'Invoice' : 'Payment'}`;
+                      }
+                    }
+                    return isEditMode 
+                      ? `Edit ${modalType === 'income' ? 'Income' : 'Expense'}` 
+                      : `Add ${modalType === 'income' ? 'Income' : 'Expense'}`;
+                  })()}
                 </h2>
                 <p className="text-sm text-slate-600 mt-1">
                   {isEditMode ? 'Update the transaction details below' : 'Fill in the transaction details'}

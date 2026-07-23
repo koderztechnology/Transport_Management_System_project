@@ -103,6 +103,7 @@ const VehicleManagement = () => {
         model: v.model || '',
         year: 2020,
         capacity: v.capacity || '',
+        chassisNumber: v.chassis_number || '',
         gvwr: '',
         mileage: '0 km',
         lastService: 'Pending',
@@ -149,13 +150,33 @@ const VehicleManagement = () => {
     const gvwrValue = Number(formData.gvwr);
 
     if (!formData.vehicleNumber.trim()) errors.vehicleNumber = 'Vehicle number is required';
-    if (!formData.modelName.trim()) errors.modelName = 'Model name is required';
+    if (!formData.modelName) {
+      errors.modelName = 'Model name is required';
+    } else if (!formData.modelName.trim()) {
+      errors.modelName = 'Spaces are not allowed.';
+    } else if (formData.modelName.trim().length < 3) {
+      errors.modelName = 'Model name must be at least 3 characters.';
+    } else if (formData.modelName.length > 50) {
+      errors.modelName = 'Model name cannot exceed 50 characters.';
+    } else if (!/^[a-zA-Z0-9\s-_]+$/.test(formData.modelName)) {
+      errors.modelName = 'Model name can only contain letters, numbers, spaces, hyphens, and underscores.';
+    }
+
     if (!formData.manufacturingYear) {
       errors.manufacturingYear = 'Manufacturing year is required';
     } else if (!Number.isInteger(manufacturingYear) || manufacturingYear < 1950 || manufacturingYear > currentYear + 1) {
       errors.manufacturingYear = 'Enter a valid manufacturing year';
     }
-    if (!formData.chassisNumber.trim()) errors.chassisNumber = 'Chassis number is required';
+
+    if (!formData.chassisNumber.trim()) {
+      errors.chassisNumber = 'Chassis number is required';
+    } else if (formData.chassisNumber.length < 17) {
+      errors.chassisNumber = 'Chassis number must be at least 17 characters';
+    } else if (formData.chassisNumber.length > 17) {
+      errors.chassisNumber = 'Chassis number cannot exceed 17 characters';
+    } else if (!/^[a-zA-Z0-9]+$/.test(formData.chassisNumber)) {
+      errors.chassisNumber = 'Special characters are not allowed.';
+    }
     if (!formData.engineNumber.trim()) errors.engineNumber = 'Engine number is required';
     if (!formData.capacity.trim() || !Number.isFinite(capacityValue) || capacityValue <= 0) {
       errors.capacity = 'Capacity must be a positive number';
@@ -195,7 +216,8 @@ const VehicleManagement = () => {
       model: formData.modelName,
       capacity: formData.capacity,
       driver: formData.ownerName || null,
-      status: 'Available'
+      status: 'Available',
+      chassis_number: formData.chassisNumber
     };
 
     try {
@@ -498,13 +520,19 @@ const VehicleManagement = () => {
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Vehicle Specifications</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Model Name *</label>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-medium text-slate-700">Model Name *</label>
+                      <span className="text-xs text-slate-400">
+                        {formData.modelName.length}/50
+                      </span>
+                    </div>
                     <input
                       type="text"
                       name="modelName"
                       value={formData.modelName}
                       onChange={handleFormChange}
                       placeholder="e.g., Tata 2523"
+                      maxLength={50}
                       className={`w-full px-4 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
                         formErrors.modelName ? 'border-red-500' : 'border-slate-200'
                       }`}
@@ -520,6 +548,7 @@ const VehicleManagement = () => {
                       value={formData.chassisNumber}
                       onChange={handleFormChange}
                       placeholder="e.g., TATA1234567890"
+                      maxLength={17}
                       className={`w-full px-4 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
                         formErrors.chassisNumber ? 'border-red-500' : 'border-slate-200'
                       }`}
@@ -744,6 +773,10 @@ const VehicleManagement = () => {
                   <div className="bg-slate-50 p-4 rounded-lg">
                     <p className="text-xs text-slate-600">Model</p>
                     <p className="text-lg font-semibold text-slate-900">{selectedVehicle.model}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <p className="text-xs text-slate-600">Chassis Number</p>
+                    <p className="text-lg font-semibold text-slate-900 font-mono">{selectedVehicle.chassisNumber || 'N/A'}</p>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-lg">
                     <p className="text-xs text-slate-600">Manufacturing Year</p>

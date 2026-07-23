@@ -52,7 +52,19 @@ const CompanySettings = ({ data, onSave }) => {
     const validationErrors = {};
     if (!form.name.trim()) validationErrors.name = "Company name is required.";
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) validationErrors.email = "Please enter a valid email address.";
-    if (form.phone && !/^\d{10}$/.test(String(form.phone).replace(/\D/g, ""))) validationErrors.phone = "Phone number must be 10 digits.";
+    
+    if (form.phone) {
+      let cleaned = String(form.phone).replace(/\D/g, "");
+      if (cleaned.length === 12 && cleaned.startsWith("91")) {
+        cleaned = cleaned.substring(2);
+      } else if (cleaned.length === 11 && cleaned.startsWith("0")) {
+        cleaned = cleaned.substring(1);
+      }
+      if (cleaned.length !== 10) {
+        validationErrors.phone = "Phone number must be 10 digits.";
+      }
+    }
+    
     if (form.gst && !/^[0-9A-Z]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(form.gst)) validationErrors.gst = "GST number format is invalid.";
     return validationErrors;
   };
@@ -187,8 +199,21 @@ const ProfileSettings = ({ data, onSave }) => {
   const handleSave = () => {
     const validationErrors = {};
     if (!form.name.trim()) validationErrors.name = "Full name is required";
-    if (!form.phone.trim()) validationErrors.phone = "Phone number is required";
-    else if (!/^\d{10}$/.test(String(form.phone).replace(/\D/g, ""))) validationErrors.phone = "Phone number must be 10 digits";
+    
+    if (!form.phone.trim()) {
+      validationErrors.phone = "Phone number is required";
+    } else {
+      let cleaned = String(form.phone).replace(/\D/g, "");
+      if (cleaned.length === 12 && cleaned.startsWith("91")) {
+        cleaned = cleaned.substring(2);
+      } else if (cleaned.length === 11 && cleaned.startsWith("0")) {
+        cleaned = cleaned.substring(1);
+      }
+      if (cleaned.length !== 10) {
+        validationErrors.phone = "Phone number must be 10 digits";
+      }
+    }
+    
     setErrors(validationErrors);
     if (Object.keys(validationErrors).length > 0) return onSave(false, "Please fix the highlighted fields");
 

@@ -117,6 +117,7 @@ const TopNavBar = () => {
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out?")) {
       localStorage.removeItem('admin_username');
+      localStorage.removeItem('user_role');
       navigate('/login');
     }
   };

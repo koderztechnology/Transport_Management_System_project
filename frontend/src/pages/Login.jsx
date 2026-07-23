@@ -22,8 +22,8 @@ const Login = () => {
       errors.username = 'Username must be at least 5 characters.';
     } else if (username.length > 30) {
       errors.username = 'Username cannot exceed 30 characters.';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-      errors.username = 'Username can only contain letters, numbers, and underscores.';
+    } else if (!/^[a-zA-Z0-9_ ]+$/.test(username)) {
+      errors.username = 'Username can only contain letters, numbers, underscores, and spaces.';
     }
 
     if (!password) {

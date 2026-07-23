@@ -7,6 +7,23 @@ class DriverViewSet(viewsets.ModelViewSet):
     queryset = Driver.objects.all().order_by("-driver_id")
     serializer_class = DriverSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated:
+            try:
+                profile = user.profile
+                if profile.role == 'Driver':
+                    from django.db.models import Q
+                    qs = qs.filter(
+                        Q(name__icontains=user.username) |
+                        Q(name__icontains=user.username.replace('_', ' ')) |
+                        Q(name__icontains=user.username.replace(' ', '_'))
+                    )
+            except Exception:
+                pass
+        return qs
+
     def get_serializer_context(self):
         return {"request": self.request}
 

@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+
 from .models import Vehicle, Trip, LRBilty, EWayBill, FinanceTransaction
 from .serializers import VehicleSerializer, TripSerializer, LRBiltySerializer, EWayBillSerializer, FinanceTransactionSerializer
 from .models import Vendor, Inventory, Tracking, SystemSetting
@@ -7,6 +8,23 @@ from .serializers import VendorSerializer, InventorySerializer, TrackingSerializ
 class VehicleViewSet(viewsets.ModelViewSet):
     queryset = Vehicle.objects.all().order_by('-pk')
     serializer_class = VehicleSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated:
+            try:
+                profile = user.profile
+                if profile.role == 'Driver':
+                    from django.db.models import Q
+                    qs = qs.filter(
+                        Q(driver__name__icontains=user.username) |
+                        Q(driver__name__icontains=user.username.replace('_', ' ')) |
+                        Q(driver__name__icontains=user.username.replace(' ', '_'))
+                    )
+            except Exception:
+                pass
+        return qs
 
     def list(self, request, *args, **kwargs):
         is_options = request.query_params.get('options') == 'true'
@@ -21,6 +39,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
                 'vehicle_number': v.vehicle_number,
                 'make': v.make,
                 'model': v.model,
+                'chassis_number': v.chassis_number,
                 'capacity': v.capacity,
                 'driver': v.driver_id,
                 'status': v.status,
@@ -30,6 +49,23 @@ class VehicleViewSet(viewsets.ModelViewSet):
 class TripViewSet(viewsets.ModelViewSet):
     queryset = Trip.objects.all().order_by('-pk')
     serializer_class = TripSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated:
+            try:
+                profile = user.profile
+                if profile.role == 'Driver':
+                    from django.db.models import Q
+                    qs = qs.filter(
+                        Q(driver__name__icontains=user.username) |
+                        Q(driver__name__icontains=user.username.replace('_', ' ')) |
+                        Q(driver__name__icontains=user.username.replace(' ', '_'))
+                    )
+            except Exception:
+                pass
+        return qs
 
     def list(self, request, *args, **kwargs):
         is_options = request.query_params.get('options') == 'true'
@@ -120,6 +156,26 @@ class FinanceTransactionViewSet(viewsets.ModelViewSet):
     queryset = FinanceTransaction.objects.all().order_by('-pk')
     serializer_class = FinanceTransactionSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated:
+            try:
+                profile = user.profile
+                if profile.role == 'Vendor':
+                    from django.db.models import Q
+                    qs = qs.filter(
+                        Q(vendor__name__icontains=user.username) |
+                        Q(vendor__name__icontains=user.username.replace('_', ' ')) |
+                        Q(vendor__name__icontains=user.username.replace(' ', '_')) |
+                        Q(vendor__contact_person__icontains=user.username) |
+                        Q(vendor__contact_person__icontains=user.username.replace('_', ' ')) |
+                        Q(vendor__contact_person__icontains=user.username.replace(' ', '_'))
+                    )
+            except Exception:
+                pass
+        return qs
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())[:100]
         data = []
@@ -158,6 +214,26 @@ def log_audit_event(message):
 class VendorViewSet(viewsets.ModelViewSet):
     queryset = Vendor.objects.all().order_by('-pk')
     serializer_class = VendorSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated:
+            try:
+                profile = user.profile
+                if profile.role == 'Vendor':
+                    from django.db.models import Q
+                    qs = qs.filter(
+                        Q(name__icontains=user.username) |
+                        Q(name__icontains=user.username.replace('_', ' ')) |
+                        Q(name__icontains=user.username.replace(' ', '_')) |
+                        Q(contact_person__icontains=user.username) |
+                        Q(contact_person__icontains=user.username.replace('_', ' ')) |
+                        Q(contact_person__icontains=user.username.replace(' ', '_'))
+                    )
+            except Exception:
+                pass
+        return qs
 
     def list(self, request, *args, **kwargs):
         is_options = request.query_params.get('options') == 'true'
@@ -218,6 +294,23 @@ class TrackingViewSet(viewsets.ModelViewSet):
     queryset = Tracking.objects.all().order_by('-pk')
     serializer_class = TrackingSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated:
+            try:
+                profile = user.profile
+                if profile.role == 'Driver':
+                    from django.db.models import Q
+                    qs = qs.filter(
+                        Q(vehicle__driver__name__icontains=user.username) |
+                        Q(vehicle__driver__name__icontains=user.username.replace('_', ' ')) |
+                        Q(vehicle__driver__name__icontains=user.username.replace(' ', '_'))
+                    )
+            except Exception:
+                pass
+        return qs
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())[:100]
         data = []
@@ -256,16 +349,36 @@ def dashboard_summary(request):
 
     user_trips = trip_qs
     user_finance = finance_qs
+    user_vehicles = vehicle_qs
 
+    from django.db.models import Q
     if role == 'Driver' and username:
-        user_trips = trip_qs.filter(driver__name__icontains=username)
-        # If the driver has no trips, keep a fallback to prevent empty state
-        if not user_trips.exists():
-            user_trips = trip_qs
+        user_trips = trip_qs.filter(
+            Q(driver__name__icontains=username) |
+            Q(driver__name__icontains=username.replace('_', ' ')) |
+            Q(driver__name__icontains=username.replace(' ', '_'))
+        )
+        user_finance = finance_qs.filter(
+            Q(trip__driver__name__icontains=username) |
+            Q(trip__driver__name__icontains=username.replace('_', ' ')) |
+            Q(trip__driver__name__icontains=username.replace(' ', '_'))
+        )
+        user_vehicles = vehicle_qs.filter(
+            Q(driver__name__icontains=username) |
+            Q(driver__name__icontains=username.replace('_', ' ')) |
+            Q(driver__name__icontains=username.replace(' ', '_'))
+        )
     elif role == 'Vendor' and username:
-        user_finance = finance_qs.filter(vendor__name__icontains=username)
-        if not user_finance.exists():
-            user_finance = finance_qs
+        user_trips = trip_qs.none()
+        user_finance = finance_qs.filter(
+            Q(vendor__name__icontains=username) |
+            Q(vendor__name__icontains=username.replace('_', ' ')) |
+            Q(vendor__name__icontains=username.replace(' ', '_')) |
+            Q(vendor__contact_person__icontains=username) |
+            Q(vendor__contact_person__icontains=username.replace('_', ' ')) |
+            Q(vendor__contact_person__icontains=username.replace(' ', '_'))
+        )
+        user_vehicles = vehicle_qs.none()
 
     # Helper for formatting Indian currency
     def format_indian_currency(amount):
@@ -539,7 +652,7 @@ def dashboard_summary(request):
 
     # 7. Vehicle Alerts
     vehicleAlerts = []
-    maintenance_vehicles = vehicle_qs.filter(status='Under Maintenance')[:4]
+    maintenance_vehicles = user_vehicles.filter(status='Under Maintenance')[:4]
     for v in maintenance_vehicles:
         vehicleAlerts.append({
             'type': 'Under Maintenance',
@@ -582,7 +695,7 @@ def dashboard_summary(request):
             'severity': 'high',
             'time': p.added_date.strftime("%b %d, %I:%M %p") if getattr(p, 'added_date', None) else "Recently",
         })
-    failed_trips = trip_qs.filter(status='Failed')[:2]
+    failed_trips = user_trips.filter(status='Failed')[:2]
     for ft in failed_trips:
          notifications.append({
             'title': 'Trip Failed Alert',
@@ -604,7 +717,7 @@ def dashboard_summary(request):
         'notifications': notifications
     })
 
-from rest_framework.decorators import permission_classes
+from rest_framework.decorators import permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
@@ -614,6 +727,7 @@ from .models import UserProfile
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def admin_signup(request):
     import re
     data = request.data
@@ -673,6 +787,7 @@ def admin_signup(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def admin_login(request):
     from django.utils import timezone
     from datetime import timedelta

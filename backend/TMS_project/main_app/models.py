@@ -125,6 +125,7 @@ class Vehicle(models.Model):
     vehicle_number = models.CharField(unique=True, max_length=50, blank=True, null=True)
     make = models.CharField(max_length=50, blank=True, null=True)
     model = models.CharField(max_length=50, blank=True, null=True)
+    chassis_number = models.CharField(unique=True, max_length=17, blank=True, null=True)
     capacity = models.CharField(max_length=50, blank=True, null=True)
     driver = models.ForeignKey('Driver', on_delete=models.SET_NULL, null=True, blank=True) 
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='Available')

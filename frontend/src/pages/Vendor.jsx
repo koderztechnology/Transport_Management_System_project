@@ -207,8 +207,21 @@ export default function VendorManagement() {
     const errors = {};
     if (!String(data.name || "").trim()) errors.name = "Vendor name is required.";
     if (!String(data.service_type || "").trim()) errors.service_type = "Vendor type is required.";
-    if (!String(data.phone || "").trim()) errors.phone = "Phone number is required.";
-    else if (!/^\d{10}$/.test(String(data.phone).replace(/\D/g, ""))) errors.phone = "Phone number must be 10 digits.";
+    
+    if (!String(data.phone || "").trim()) {
+      errors.phone = "Phone number is required.";
+    } else {
+      let cleaned = String(data.phone).replace(/\D/g, "");
+      if (cleaned.length === 12 && cleaned.startsWith("91")) {
+        cleaned = cleaned.substring(2);
+      } else if (cleaned.length === 11 && cleaned.startsWith("0")) {
+        cleaned = cleaned.substring(1);
+      }
+      if (cleaned.length !== 10) {
+        errors.phone = "Phone number must be 10 digits.";
+      }
+    }
+    
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.email))) errors.email = "Please enter a valid email address.";
     return errors;
   };
@@ -225,6 +238,15 @@ export default function VendorManagement() {
 
     // Clean payload for Django
     const payload = { ...newVendor };
+    if (payload.phone) {
+      let cleaned = String(payload.phone).replace(/\D/g, "");
+      if (cleaned.length === 12 && cleaned.startsWith("91")) {
+        cleaned = cleaned.substring(2);
+      } else if (cleaned.length === 11 && cleaned.startsWith("0")) {
+        cleaned = cleaned.substring(1);
+      }
+      payload.phone = cleaned;
+    }
     if (!payload.email) payload.email = null; // Prevent "Enter a valid email address" from DRF
     delete payload.gst; // Just in case it sneaks in from edit mode old data
 

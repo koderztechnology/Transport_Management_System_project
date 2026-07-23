@@ -15,6 +15,13 @@ def main():
             "available on your PYTHONPATH environment variable? Did you "
             "forget to activate a virtual environment?"
         ) from exc
+    # Bypass slow reverse DNS lookup on Windows during development
+    try:
+        from django.core.servers.basehttp import WSGIRequestHandler
+        WSGIRequestHandler.address_string = lambda self: self.client_address[0]
+    except ImportError:
+        pass
+
     execute_from_command_line(sys.argv)
 
 

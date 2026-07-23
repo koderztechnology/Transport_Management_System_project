@@ -509,7 +509,9 @@ const Dashboard = () => {
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-slate-900">Activity Log</h3>
-          <button onClick={() => navigate('/tracking-analytics')} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer">View All</button>
+          {userRole !== 'Driver' && userRole !== 'Vendor' && (
+            <button onClick={() => navigate('/tracking-analytics')} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer">View All</button>
+          )}
         </div>
         <div className="space-y-4 max-h-96 overflow-y-auto">
           {activityLog.map((activity, index) => (

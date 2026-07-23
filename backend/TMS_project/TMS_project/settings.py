@@ -110,8 +110,10 @@ if DB_NAME and DB_USER and DB_HOST:
             "PASSWORD": DB_PASSWORD or "",
             "HOST": DB_HOST,
             "PORT": DB_PORT or "3306",
+            "CONN_MAX_AGE": 600,
             "OPTIONS": {
                 "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+                "ssl_disabled": True,
             },
         }
     }
@@ -172,7 +174,10 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'main_app.authentication.CsrfExemptSessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
