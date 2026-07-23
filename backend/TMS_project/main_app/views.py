@@ -772,16 +772,24 @@ def admin_signup(request):
     
     if role == 'Driver':
         # Ensure we have a Driver database instance matching the signup username
-        Driver.objects.create(
-            name=username,
-            phone='',
-            license='PENDING',
-            experience='0',
-            city='Default',
-            state='Default',
-            dob='2000-01-01',
-            status='Active'
-        )
+        # Only create it if a Driver profile does not already exist
+        from django.db.models import Q
+        driver_exists = Driver.objects.filter(
+            Q(name__iexact=username) |
+            Q(name__iexact=username.replace('_', ' ')) |
+            Q(name__iexact=username.replace(' ', '_'))
+        ).exists()
+        if not driver_exists:
+            Driver.objects.create(
+                name=username,
+                phone='',
+                license='PENDING',
+                experience='0',
+                city='Default',
+                state='Default',
+                dob='2000-01-01',
+                status='Active'
+            )
     
     return Response({'message': 'Admin user created successfully', 'username': username, 'role': role})
 
